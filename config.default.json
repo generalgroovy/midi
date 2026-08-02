@@ -1,20 +1,27 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "include": [
     "defaults/actions.json",
+    "defaults/model.json",
+    "defaults/scripts.json",
+    "defaults/visuals.json",
     "defaults/f1.json",
     "defaults/x1.json"
   ],
-  "active_profile": "desktop",
+  "active_profile": "linux-ops",
   "profiles": {
-    "desktop": {
-      "description": "Basic global desktop, media, audio and Sway controls for X1 MK1 and F1."
+    "linux-ops": {
+      "description": "Complementary Linux desktop, operations, monitoring, maintenance, AI-model and script controls with no repeated action signatures per controller."
     },
     "blank": {
-      "description": "No mappings; use for learning or building a layout from scratch."
+      "description": "No mappings."
     }
   },
+  "layout_rules": {
+    "no_repeated_actions_per_controller": true
+  },
   "runtime": {
-    "log_actions": true
+    "log_actions": true,
+    "notify_actions": false
   }
 }
