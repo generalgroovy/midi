@@ -2,23 +2,10 @@
   "_instructions": [
     "Run traktor-system-controller --monitor.",
     "Press or turn one physical control at a time.",
-    "Copy its device, channel and note/control number into a mapping below.",
-    "Use type 'note' for note_on buttons and 'cc_button' for control_change buttons.",
-    "Use cc_mappings for knobs, encoders and faders."
+    "Copy the reported device, control and kind into a mapping.",
+    "The X1 MK1 uses Linux evdev; the F1 uses USB HID.",
+    "Mappings using numbers 999 are disabled examples and should be replaced."
   ],
-  "device_aliases": {
-    "x1": [
-      "Traktor Kontrol X1",
-      "Kontrol X1",
-      "X1 MK1",
-      "X1 MK2",
-      "X1 MK3"
-    ],
-    "f1": [
-      "Traktor Kontrol F1",
-      "Kontrol F1"
-    ]
-  },
   "actions": {
     "browser": [
       "firefox"
@@ -70,46 +57,47 @@
       "-f"
     ]
   },
-  "button_mappings": [
+  "mappings": [
     {
       "_replace_this_example": true,
       "device": "f1",
-      "type": "note",
-      "channel": 0,
-      "number": 999,
-      "action": "browser"
+      "control": "grid_1",
+      "kind": "press",
+      "action": "browser",
+      "enabled": false
+    },
+    {
+      "_replace_this_example": true,
+      "device": "f1",
+      "control": "knob_1",
+      "kind": "absolute",
+      "action": "volume_absolute",
+      "enabled": false
+    },
+    {
+      "_replace_this_example": true,
+      "device": "f1",
+      "control": "knob_2",
+      "kind": "absolute",
+      "action": "bass_preset_absolute",
+      "enabled": false
     },
     {
       "_replace_this_example": true,
       "device": "x1",
-      "type": "cc_button",
-      "channel": 0,
-      "number": 999,
-      "action": "play_pause"
-    }
-  ],
-  "cc_mappings": [
-    {
-      "_replace_this_example": true,
-      "device": "f1",
-      "channel": 0,
-      "number": 999,
-      "action": "volume_absolute"
+      "control": "BTN_0",
+      "kind": "press",
+      "action": "play_pause",
+      "enabled": false
     },
     {
       "_replace_this_example": true,
       "device": "x1",
-      "channel": 0,
-      "number": 999,
+      "control": "ABS_X",
+      "kind": "relative",
       "action": "volume_relative",
-      "relative_mode": "twos-complement"
-    },
-    {
-      "_replace_this_example": true,
-      "device": "f1",
-      "channel": 0,
-      "number": 998,
-      "action": "bass_preset_absolute"
+      "sensitivity": 1,
+      "enabled": false
     }
   ],
   "bass_presets": [
