@@ -1,6 +1,7 @@
 [Unit]
 Description=Traktor X1/F1 Linux system controller
-After=pipewire.service wireplumber.service
+After=graphical-session.target pipewire.service wireplumber.service
+Wants=graphical-session.target
 
 [Service]
 Type=simple
