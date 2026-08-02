@@ -1,13 +1,28 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "include": [
     "defaults/actions.json",
+    "defaults/model.json",
+    "defaults/scripts.json",
+    "defaults/visuals.json",
     "defaults/f1.json",
     "defaults/x1.json"
   ],
-  "active_profile": "desktop",
-  "runtime": {
-    "log_actions": true
+  "active_profile": "linux-ops",
+  "profiles": {
+    "linux-ops": {
+      "description": "Complementary Linux desktop, operations, monitoring, maintenance, AI-model and script controls with no repeated action signatures per controller."
+    },
+    "blank": {
+      "description": "No mappings."
+    }
   },
-  "_customization": "Add or override actions, mappings, aliases and profiles in this file."
+  "layout_rules": {
+    "no_repeated_actions_per_controller": true
+  },
+  "runtime": {
+    "log_actions": true,
+    "notify_actions": false
+  },
+  "_customization": "Override actions, script_slots, model_controls, visuals, connection policy or mappings here. Included lists concatenate; objects recursively merge."
 }
