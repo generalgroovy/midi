@@ -1,0 +1,28 @@
+{
+  "script_slots": {
+    "autocode": {"label": "Autocode workspace", "enabled": false, "command": ["foot", "--working-directory={home}/Projects/autocode"]},
+    "codex": {"label": "Codex CLI", "enabled": true, "command": ["foot", "fish", "-lc", "codex; exec fish"]},
+    "ollama": {"label": "Ollama console", "enabled": true, "command": ["foot", "fish", "-lc", "ollama list; echo; exec fish"]},
+    "odysseus": {"label": "Odysseus web", "enabled": true, "command": ["xdg-open", "http://127.0.0.1:7000"]},
+    "flux2": {"label": "FLUX2 workspace", "enabled": true, "command": ["foot", "--working-directory={home}/Projects/flux2"]},
+    "github_midi": {"label": "MIDI repository", "enabled": true, "command": ["xdg-open", "https://github.com/generalgroovy/midi"]},
+    "aider": {"label": "Aider in FLUX2", "enabled": false, "command": ["foot", "--working-directory={home}/Projects/flux2", "fish", "-lc", "aider; exec fish"]},
+    "opencode": {"label": "OpenCode", "enabled": false, "command": ["foot", "fish", "-lc", "opencode; exec fish"]},
+    "ollama_logs": {"label": "Ollama logs", "enabled": true, "command": ["foot", "fish", "-lc", "journalctl -u ollama -f; exec fish"]},
+    "odysseus_status": {"label": "Odysseus status", "enabled": true, "command": ["foot", "fish", "-lc", "docker ps --format \"table {{.Names}}\\t{{.Status}}\\t{{.Ports}}\"; exec fish"]},
+    "model_hook": {"label": "Edit model hook", "enabled": true, "command": ["foot", "fish", "-lc", "nano ~/.config/traktor-system-controller/hooks/model-controls-updated; exec fish"]},
+    "controller_repo": {"label": "Controller repository shell", "enabled": true, "command": ["foot", "--working-directory={home}/Projects/midi"]},
+    "custom_01": {"label": "Custom script 01", "enabled": false, "command": ["{home}/.local/bin/traktor-slot-01"]},
+    "custom_02": {"label": "Custom script 02", "enabled": false, "command": ["{home}/.local/bin/traktor-slot-02"]},
+    "custom_03": {"label": "Custom script 03", "enabled": false, "command": ["{home}/.local/bin/traktor-slot-03"]},
+    "custom_04": {"label": "Custom script 04", "enabled": false, "command": ["{home}/.local/bin/traktor-slot-04"]},
+    "custom_05": {"label": "Custom script 05", "enabled": false, "command": ["{home}/.local/bin/traktor-slot-05"]},
+    "custom_06": {"label": "Custom script 06", "enabled": false, "command": ["{home}/.local/bin/traktor-slot-06"]},
+    "custom_07": {"label": "Custom script 07", "enabled": false, "command": ["{home}/.local/bin/traktor-slot-07"]},
+    "custom_08": {"label": "Custom script 08", "enabled": false, "command": ["{home}/.local/bin/traktor-slot-08"]},
+    "custom_09": {"label": "Custom script 09", "enabled": false, "command": ["{home}/.local/bin/traktor-slot-09"]},
+    "custom_10": {"label": "Custom script 10", "enabled": false, "command": ["{home}/.local/bin/traktor-slot-10"]},
+    "custom_11": {"label": "Custom script 11", "enabled": false, "command": ["{home}/.local/bin/traktor-slot-11"]},
+    "custom_12": {"label": "Custom script 12", "enabled": false, "command": ["{home}/.local/bin/traktor-slot-12"]}
+  }
+}
