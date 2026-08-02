@@ -1,113 +1,13 @@
 {
-  "_instructions": [
-    "Run traktor-system-controller --monitor.",
-    "Press or turn one physical control at a time.",
-    "Copy the reported device, control and kind into a mapping.",
-    "The X1 MK1 uses Linux evdev; the F1 uses USB HID.",
-    "Mappings using numbers 999 are disabled examples and should be replaced."
+  "schema_version": 2,
+  "include": [
+    "defaults/actions.json",
+    "defaults/f1.json",
+    "defaults/x1.json"
   ],
-  "actions": {
-    "browser": [
-      "firefox"
-    ],
-    "terminal": [
-      "foot"
-    ],
-    "files": [
-      "thunar"
-    ],
-    "play_pause": [
-      "playerctl",
-      "play-pause"
-    ],
-    "next_track": [
-      "playerctl",
-      "next"
-    ],
-    "previous_track": [
-      "playerctl",
-      "previous"
-    ],
-    "mute_output": [
-      "wpctl",
-      "set-mute",
-      "@DEFAULT_AUDIO_SINK@",
-      "toggle"
-    ],
-    "mute_microphone": [
-      "wpctl",
-      "set-mute",
-      "@DEFAULT_AUDIO_SOURCE@",
-      "toggle"
-    ],
-    "workspace_1": [
-      "swaymsg",
-      "workspace",
-      "number",
-      "1"
-    ],
-    "workspace_2": [
-      "swaymsg",
-      "workspace",
-      "number",
-      "2"
-    ],
-    "lock_screen": [
-      "swaylock",
-      "-f"
-    ]
+  "active_profile": "desktop",
+  "runtime": {
+    "log_actions": true
   },
-  "mappings": [
-    {
-      "_replace_this_example": true,
-      "device": "f1",
-      "control": "grid_1",
-      "kind": "press",
-      "action": "browser",
-      "enabled": false
-    },
-    {
-      "_replace_this_example": true,
-      "device": "f1",
-      "control": "knob_1",
-      "kind": "absolute",
-      "action": "volume_absolute",
-      "enabled": false
-    },
-    {
-      "_replace_this_example": true,
-      "device": "f1",
-      "control": "knob_2",
-      "kind": "absolute",
-      "action": "bass_preset_absolute",
-      "enabled": false
-    },
-    {
-      "_replace_this_example": true,
-      "device": "x1",
-      "control": "BTN_0",
-      "kind": "press",
-      "action": "play_pause",
-      "enabled": false
-    },
-    {
-      "_replace_this_example": true,
-      "device": "x1",
-      "control": "ABS_X",
-      "kind": "relative",
-      "action": "volume_relative",
-      "sensitivity": 1,
-      "enabled": false
-    }
-  ],
-  "bass_presets": [
-    "Bass-0",
-    "Bass-1",
-    "Bass-2",
-    "Bass-3",
-    "Bass-4",
-    "Bass-5",
-    "Bass-6",
-    "Bass-7"
-  ]
+  "_customization": "Add or override actions, mappings, aliases and profiles in this file."
 }
