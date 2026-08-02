@@ -1,0 +1,27 @@
+{
+  "hardware": {
+    "x1_backend": "raw_usb",
+    "fallback_to_evdev": true
+  },
+  "connection": {
+    "policy": "prompt",
+    "remember": true,
+    "state_file": "~/.config/traktor-system-controller/device-decisions.json"
+  },
+  "visuals": {
+    "enabled": true,
+    "theme": "category",
+    "theme_state_file": "~/.config/traktor-system-controller/visual-theme",
+    "x1": {"dim": 5, "active": 28, "pressed": 127},
+    "action_categories": {
+      "browser": "application", "terminal": "application", "files": "application", "projects": "application", "app_launcher": "application", "window_switcher": "application", "clipboard_history": "application", "display_settings": "application", "notification_center": "application",
+      "workspace_1": "workspace", "workspace_2": "workspace", "workspace_3": "workspace", "workspace_4": "workspace", "workspace_relative": "workspace", "sway_reload": "workspace",
+      "audio_controls": "audio", "audio_graph": "audio", "mute_output": "audio", "volume_absolute": "audio", "volume_relative": "audio", "source_volume_absolute": "audio", "source_volume_relative": "audio", "bass_preset_absolute": "audio",
+      "play_pause": "media", "previous_track": "media", "next_track": "media", "media_seek_relative": "media",
+      "system_dashboard": "monitor", "controller_logs": "monitor", "ollama_status": "monitor", "ollama_models": "monitor", "journal_errors": "monitor", "failed_services": "monitor", "disk_usage": "monitor", "system_info": "monitor", "sensors": "monitor", "network_monitor": "monitor", "open_ports": "monitor", "kernel_log": "monitor", "top_processes": "monitor", "usb_devices": "monitor", "mounts": "monitor", "user_services": "monitor", "system_timers": "monitor", "package_updates": "monitor",
+      "controller_config": "maintenance", "controller_layout": "maintenance", "controller_restart": "maintenance", "system_update": "maintenance", "power_menu": "maintenance", "orphan_packages": "maintenance", "package_cache": "maintenance", "network_settings": "maintenance", "bluetooth_settings": "maintenance",
+      "lock_screen": "system", "screenshot": "system", "screen_record_toggle": "system", "brightness_absolute": "system", "brightness_relative": "system", "sway_gap_absolute": "system",
+      "model_state_view": "model", "model_parameter_absolute": "model", "model_parameter_relative": "model", "odysseus_open": "model", "script_slot": "script"
+    }
+  }
+}
