@@ -1,0 +1,157 @@
+{
+  "control_aliases": {
+    "x1": {
+      "BTN_0": "deck_a_play",
+      "BTN_1": "deck_a_cue",
+      "BTN_2": "deck_a_beat_left",
+      "BTN_3": "deck_a_out",
+      "BTN_8": "deck_a_fx2",
+      "BTN_9": "deck_a_fx1",
+      "BTN_12": "deck_b_in",
+      "BTN_13": "deck_b_beat_right",
+      "BTN_14": "deck_b_cup",
+      "BTN_15": "deck_b_sync",
+      "BTN_16": "deck_b_play",
+      "BTN_17": "deck_b_cue",
+      "BTN_18": "deck_b_beat_left",
+      "BTN_19": "deck_b_out",
+      "BTN_20": "deck_a_in",
+      "BTN_21": "deck_a_beat_right",
+      "BTN_22": "deck_a_cup",
+      "BTN_23": "deck_a_sync",
+      "BTN_24": "deck_a_browse_button",
+      "BTN_25": "deck_b_browse_button",
+      "BTN_26": "deck_a_loop_button",
+      "BTN_27": "deck_b_loop_button",
+      "BTN_28": "fx1_on",
+      "BTN_29": "fx1_button_1",
+      "BTN_30": "fx1_button_2",
+      "BTN_31": "fx1_button_3",
+      "BTN_32": "fx2_on",
+      "BTN_33": "fx2_button_1",
+      "BTN_34": "fx2_button_2",
+      "BTN_35": "fx2_button_3",
+      "BTN_36": "shift",
+      "BTN_37": "deck_b_fx2",
+      "BTN_38": "deck_b_fx1",
+      "BTN_39": "hotcue",
+      "ABS_X": "deck_a_browse_encoder",
+      "ABS_Y": "deck_b_browse_encoder",
+      "ABS_Z": "deck_a_loop_encoder",
+      "ABS_MISC": "deck_b_loop_encoder",
+      "ABS_HAT0X": "fx1_dry_wet",
+      "ABS_HAT0Y": "fx2_dry_wet",
+      "ABS_HAT1X": "fx1_knob_1",
+      "ABS_HAT1Y": "fx2_knob_1",
+      "ABS_HAT2X": "fx1_knob_2",
+      "ABS_HAT2Y": "fx2_knob_2",
+      "ABS_HAT3X": "fx1_knob_3",
+      "ABS_HAT3Y": "fx2_knob_3"
+    }
+  },
+  "actions": {
+    "browser": [
+      "xdg-open",
+      "https://www.google.com"
+    ],
+    "terminal": [
+      "foot"
+    ],
+    "files": [
+      "xdg-open",
+      "{home}"
+    ],
+    "launcher": [
+      "wofi",
+      "--show",
+      "drun"
+    ],
+    "play_pause": [
+      "playerctl",
+      "play-pause"
+    ],
+    "next_track": [
+      "playerctl",
+      "next"
+    ],
+    "previous_track": [
+      "playerctl",
+      "previous"
+    ],
+    "mute_output": [
+      "wpctl",
+      "set-mute",
+      "@DEFAULT_AUDIO_SINK@",
+      "toggle"
+    ],
+    "mute_microphone": [
+      "wpctl",
+      "set-mute",
+      "@DEFAULT_AUDIO_SOURCE@",
+      "toggle"
+    ],
+    "workspace_1": [
+      "swaymsg",
+      "workspace",
+      "number",
+      "1"
+    ],
+    "workspace_2": [
+      "swaymsg",
+      "workspace",
+      "number",
+      "2"
+    ],
+    "workspace_3": [
+      "swaymsg",
+      "workspace",
+      "number",
+      "3"
+    ],
+    "workspace_4": [
+      "swaymsg",
+      "workspace",
+      "number",
+      "4"
+    ],
+    "workspace_next": [
+      "swaymsg",
+      "workspace",
+      "next"
+    ],
+    "workspace_previous": [
+      "swaymsg",
+      "workspace",
+      "prev"
+    ],
+    "audio_controls": [
+      "pavucontrol"
+    ],
+    "audio_effects": [
+      "easyeffects"
+    ],
+    "lock_screen": [
+      "swaylock",
+      "-f"
+    ],
+    "screenshot": "mkdir -p \"$HOME/Pictures/Screenshots\" && grim -g \"$(slurp)\" \"$HOME/Pictures/Screenshots/$(date +%Y%m%d-%H%M%S).png\"",
+    "custom_script": [
+      "{home}/.local/bin/traktor-custom-action",
+      "{device}",
+      "{control}",
+      "{kind}",
+      "{value}",
+      "{percent}"
+    ]
+  },
+  "bass_presets": [
+    "Bass-0",
+    "Bass-1",
+    "Bass-2",
+    "Bass-3",
+    "Bass-4",
+    "Bass-5",
+    "Bass-6",
+    "Bass-7"
+  ]
+}
