@@ -19,14 +19,18 @@ jobs:
         run: python -m py_compile traktor-system-controller.py traktor-controller.py traktor_controller/*.py
       - name: Validate configuration
         run: |
-          python -m json.tool config.default.json >/dev/null
-          python -m json.tool config.example.json >/dev/null
-          python -m json.tool config.blank.json >/dev/null
-          python -m json.tool defaults/actions.json >/dev/null
-          python -m json.tool defaults/f1.json >/dev/null
-          python -m json.tool defaults/x1.json >/dev/null
+          for file in config.default.json config.example.json config.blank.json defaults/*.json; do
+            python -m json.tool "$file" >/dev/null
+          done
           TRAKTOR_CONTROLLER_BACKEND=$PWD/traktor-system-controller.py python traktor-controller.py --config config.default.json --validate-config
       - name: Run tests
         run: python -m unittest discover -s tests -v
       - name: Validate shell
-        run: bash -n install.sh examples/traktor-custom-action
+        run: bash -n install.sh helpers/system-actions examples/model-controls-updated
+      - name: Validate SVG assets
+        run: python - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          for path in Path('assets').glob('*.svg'):
+              ET.parse(path)
+          PY
