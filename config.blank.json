@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "active_profile": "blank",
+  "profiles": {
+    "blank": {
+      "description": "Empty mapping profile."
+    }
+  },
+  "runtime": {
+    "log_actions": true
+  },
+  "actions": {},
+  "mappings": [],
+  "bass_presets": []
+}
