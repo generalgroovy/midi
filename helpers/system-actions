@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ACTION="${1:-}"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/traktor-system-controller"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/traktor-system-controller"
+mkdir -p "$STATE_DIR"
+
+notify() {
+  command -v notify-send >/dev/null && notify-send "Traktor system controller" "$1" || true
+}
+
+terminal() {
+  local title="$1" command_text="$2"
+  foot --title="$title" fish -lc "$command_text; echo; read -P 'Press Enter to close…'" >/dev/null 2>&1 &
+}
+
+case "$ACTION" in
+  clipboard-history)
+    if command -v cliphist >/dev/null && command -v wofi >/dev/null; then
+      selection="$(cliphist list | wofi --dmenu --prompt 'Clipboard')" || exit 0
+      [[ -n "$selection" ]] && printf '%s' "$selection" | cliphist decode | wl-copy
+    else notify "Install cliphist, wl-clipboard and wofi for clipboard history."; fi
+    ;;
+  notifications)
+    if command -v swaync-client >/dev/null; then swaync-client -t
+    elif command -v makoctl >/dev/null; then makoctl restore
+    else notify "No supported notification-center command found."; fi
+    ;;
+  network-settings) terminal "Network settings" "nmtui" ;;
+  bluetooth-settings)
+    if command -v blueman-manager >/dev/null; then blueman-manager >/dev/null 2>&1 &
+    else terminal "Bluetooth" "bluetoothctl"; fi
+    ;;
+  dashboard) terminal "System dashboard" "btop" ;;
+  controller-config) terminal "Controller configuration" "nano '$CONFIG_DIR/config.json'" ;;
+  controller-layout) terminal "Controller layout" "traktor-system-controller --show-layout" ;;
+  controller-logs) terminal "Controller logs" "journalctl --user -u traktor-system-controller.service -f" ;;
+  screenshot)
+    mkdir -p "$HOME/Pictures/Screenshots"
+    target="$HOME/Pictures/Screenshots/$(date +%Y%m%d-%H%M%S).png"
+    geometry="$(slurp)" || exit 0
+    grim -g "$geometry" "$target"
+    notify "Screenshot saved to $target"
+    ;;
+  screen-record-toggle)
+    pidfile="$STATE_DIR/wf-recorder.pid"
+    if [[ -s "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+      kill -INT "$(cat "$pidfile")" || true
+      rm -f "$pidfile"
+      notify "Screen recording stopped."
+    else
+      mkdir -p "$HOME/Videos"
+      target="$HOME/Videos/recording-$(date +%Y%m%d-%H%M%S).mp4"
+      wf-recorder -f "$target" >/dev/null 2>&1 &
+      echo $! > "$pidfile"
+      notify "Screen recording started: $target"
+    fi
+    ;;
+  model-state)
+    file="$CONFIG_DIR/model-controls.json"
+    terminal "Model controls" "if test -f '$file'; jq . '$file' 2>/dev/null || cat '$file'; else echo 'Move a mapped model knob first.'; end"
+    ;;
+  ollama-status) terminal "Ollama status" "ollama ps" ;;
+  ollama-models) terminal "Ollama models" "ollama list" ;;
+  journal-errors) terminal "Boot errors" "journalctl -b -p err --no-pager" ;;
+  failed-services) terminal "Failed services" "systemctl --failed; echo; systemctl --user --failed" ;;
+  disk-usage) terminal "Disk usage" "ncdu '$HOME'" ;;
+  system-info) terminal "System information" "fastfetch" ;;
+  sensors) terminal "Hardware sensors" "sensors" ;;
+  network-monitor) terminal "Network monitor" "bmon" ;;
+  open-ports) terminal "Listening ports" "ss -tulpn" ;;
+  kernel-log) terminal "Kernel log" "journalctl -k -b --no-pager" ;;
+  top-processes) terminal "Processes" "btop" ;;
+  usb-devices) terminal "USB devices" "lsusb -t; echo; lsusb" ;;
+  mounts) terminal "Mounts" "findmnt" ;;
+  orphan-packages) terminal "Orphan packages" "pacman -Qtdq 2>/dev/null || echo 'No orphan packages.'" ;;
+  package-cache) terminal "Package cache" "du -sh /var/cache/pacman/pkg 2>/dev/null; echo; ls -lh /var/cache/pacman/pkg | tail -n 30" ;;
+  user-services) terminal "User services" "systemctl --user --type=service --state=running" ;;
+  system-timers) terminal "System timers" "systemctl list-timers --all; echo; systemctl --user list-timers --all" ;;
+  controller-restart) systemctl --user restart traktor-system-controller.service ;;
+  package-updates) terminal "Package updates" "if command -q checkupdates; checkupdates; else pacman -Qu; end" ;;
+  system-update) terminal "System update" "if command -q garuda-update; garuda-update; else sudo pacman -Syu; end" ;;
+  power-menu)
+    choice="$(printf 'Lock\nSuspend\nReboot\nPower off\n' | wofi --dmenu --prompt 'Power')" || exit 0
+    case "$choice" in
+      Lock) swaylock -f ;;
+      Suspend) systemctl suspend ;;
+      Reboot) zenity --question --text='Reboot now?' && systemctl reboot ;;
+      "Power off") zenity --question --text='Power off now?' && systemctl poweroff ;;
+    esac
+    ;;
+  *) printf 'Unknown system action: %s\n' "$ACTION" >&2; exit 2 ;;
+esac
