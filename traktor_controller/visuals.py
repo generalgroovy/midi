@@ -171,10 +171,12 @@ class F1Visual:
             self._grid(packet, number, color)
         for control, index in F1_BUTTON_LED_INDEX.items():
             active = mapping_category(self.config, "f1", control) != "unmapped"
-            packet[index] = 127 if control in self.pressed else (28 if active else 3)
+            idle = 0 if self.theme == "blackout" else (28 if active else 3)
+            packet[index] = 127 if control in self.pressed else idle
         for control, indexes in F1_PLAY_LED_INDEX.items():
             active = mapping_category(self.config, "f1", control) != "unmapped"
-            value = 127 if control in self.pressed else (42 if active else 3)
+            idle = 0 if self.theme == "blackout" else (42 if active else 3)
+            value = 127 if control in self.pressed else idle
             for index in indexes:
                 packet[index] = value
         self.base = packet
@@ -200,8 +202,8 @@ class X1Visual:
         self.theme = theme
         self.pressed_controls: set[str] = set()
         options = config.get("visuals", {}).get("x1", {})
-        self.dim = int(options.get("dim", 5))
-        self.active = int(options.get("active", 0 if theme == "blackout" else 28))
+        self.dim = 0 if theme == "blackout" else int(options.get("dim", 5))
+        self.active = 0 if theme == "blackout" else int(options.get("active", 28))
         self.pressed = int(options.get("pressed", 127))
         self.base = bytearray(32)
         self._render()
