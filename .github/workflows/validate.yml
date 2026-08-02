@@ -16,8 +16,17 @@ jobs:
         with:
           python-version: "3.13"
       - name: Validate Python
-        run: python -m py_compile traktor-system-controller.py
-      - name: Validate JSON
-        run: python -m json.tool config.example.json >/dev/null
+        run: python -m py_compile traktor-system-controller.py traktor-controller.py traktor_controller/*.py
+      - name: Validate configuration
+        run: |
+          python -m json.tool config.default.json >/dev/null
+          python -m json.tool config.example.json >/dev/null
+          python -m json.tool config.blank.json >/dev/null
+          python -m json.tool defaults/actions.json >/dev/null
+          python -m json.tool defaults/f1.json >/dev/null
+          python -m json.tool defaults/x1.json >/dev/null
+          TRAKTOR_CONTROLLER_BACKEND=$PWD/traktor-system-controller.py python traktor-controller.py --config config.default.json --validate-config
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
       - name: Validate shell
-        run: bash -n install.sh
+        run: bash -n install.sh examples/traktor-custom-action
