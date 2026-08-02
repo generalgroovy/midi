@@ -1,0 +1,12 @@
+[Unit]
+Description=Traktor X1/F1 Linux system controller
+After=pipewire.service wireplumber.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/traktor-system-controller
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
