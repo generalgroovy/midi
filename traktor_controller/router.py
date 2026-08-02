@@ -12,8 +12,9 @@ class EventRouter:
         self, config: dict[str, Any], monitor: bool,
         profile: str | None = None, dry_run: bool = False,
     ):
+        self.config = config
         self.monitor = monitor
-        self.profile = profile or str(config.get("active_profile", "desktop"))
+        self.profile = profile or str(config.get("active_profile", "linux-ops"))
         self.dispatcher = ActionDispatcher(config, dry_run=dry_run)
         self.mappings: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
         self.last_dispatch: dict[tuple[str, str, str], float] = {}
@@ -86,7 +87,7 @@ class EventRouter:
             mappings = self.mappings.get(key, [])
             if event.kind == "absolute" and mappings:
                 now = time.monotonic()
-                if now - self.last_dispatch.get(key, 0.0) < 0.025:
+                if now - self.last_dispatch.get(key, 0.0) < 0.04:
                     return
                 self.last_dispatch[key] = now
             for mapping in mappings:
