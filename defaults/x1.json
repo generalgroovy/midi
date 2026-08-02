@@ -1,0 +1,295 @@
+{
+  "mappings": [
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_a_play",
+      "kind": "press",
+      "action": "play_pause",
+      "enabled": true,
+      "unless": [
+        "x1.shift"
+      ]
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_b_play",
+      "kind": "press",
+      "action": "play_pause",
+      "enabled": true,
+      "unless": [
+        "x1.shift"
+      ]
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_a_play",
+      "kind": "press",
+      "action": "previous_track",
+      "enabled": true,
+      "requires": [
+        "x1.shift"
+      ]
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_b_play",
+      "kind": "press",
+      "action": "next_track",
+      "enabled": true,
+      "requires": [
+        "x1.shift"
+      ]
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_a_cue",
+      "kind": "press",
+      "action": "previous_track",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_b_cue",
+      "kind": "press",
+      "action": "next_track",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_a_sync",
+      "kind": "press",
+      "action": "mute_output",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_b_sync",
+      "kind": "press",
+      "action": "mute_microphone",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_a_browse_encoder",
+      "kind": "relative",
+      "action": "volume_relative",
+      "enabled": true,
+      "sensitivity": 2
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_b_browse_encoder",
+      "kind": "relative",
+      "action": "brightness_relative",
+      "enabled": true,
+      "sensitivity": 2
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_a_loop_encoder",
+      "kind": "relative",
+      "action": "media_seek_relative",
+      "enabled": true,
+      "sensitivity": 5
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_b_loop_encoder",
+      "kind": "relative",
+      "action": "workspace_relative",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_a_browse_button",
+      "kind": "press",
+      "action": "terminal",
+      "enabled": true,
+      "unless": [
+        "x1.shift"
+      ]
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_a_browse_button",
+      "kind": "press",
+      "action": "launcher",
+      "enabled": true,
+      "requires": [
+        "x1.shift"
+      ]
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_b_browse_button",
+      "kind": "press",
+      "action": "browser",
+      "enabled": true,
+      "unless": [
+        "x1.shift"
+      ]
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_b_browse_button",
+      "kind": "press",
+      "action": "files",
+      "enabled": true,
+      "requires": [
+        "x1.shift"
+      ]
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_a_fx1",
+      "kind": "press",
+      "action": "workspace_1",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_a_fx2",
+      "kind": "press",
+      "action": "workspace_2",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_b_fx1",
+      "kind": "press",
+      "action": "workspace_3",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "deck_b_fx2",
+      "kind": "press",
+      "action": "workspace_4",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "fx1_on",
+      "kind": "press",
+      "action": "audio_controls",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "fx2_on",
+      "kind": "press",
+      "action": "audio_effects",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "fx1_button_1",
+      "kind": "press",
+      "action": "screenshot",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "fx2_button_1",
+      "kind": "press",
+      "action": "lock_screen",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "fx1_button_2",
+      "kind": "press",
+      "action": "previous_track",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "fx2_button_2",
+      "kind": "press",
+      "action": "next_track",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "fx1_button_3",
+      "kind": "press",
+      "action": "terminal",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "fx2_button_3",
+      "kind": "press",
+      "action": "browser",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "fx1_dry_wet",
+      "kind": "absolute",
+      "action": "volume_absolute",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "fx2_dry_wet",
+      "kind": "absolute",
+      "action": "bass_preset_absolute",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "fx1_knob_1",
+      "kind": "absolute",
+      "action": "brightness_absolute",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "fx2_knob_1",
+      "kind": "absolute",
+      "action": "source_volume_absolute",
+      "enabled": true
+    },
+    {
+      "profile": "desktop",
+      "device": "x1",
+      "control": "hotcue",
+      "kind": "press",
+      "action": "custom_script",
+      "enabled": false
+    }
+  ]
+}
