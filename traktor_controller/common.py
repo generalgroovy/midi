@@ -12,6 +12,8 @@ BUILTIN_ACTIONS = {
     "source_volume_absolute", "source_volume_relative",
     "brightness_absolute", "brightness_relative",
     "bass_preset_absolute", "media_seek_relative", "workspace_relative",
+    "sway_gap_absolute", "model_parameter_absolute", "model_parameter_relative",
+    "script_slot",
 }
 
 X1_DEFAULT_ALIASES = {
@@ -43,6 +45,18 @@ X1_DEFAULT_ALIASES = {
 
 def log(message: str) -> None:
     print(message, flush=True)
+
+
+def expand_path(value: str | Path) -> Path:
+    return Path(value).expanduser()
+
+
+def atomic_write_json(path: Path, value: Any) -> None:
+    path = path.expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(path)
 
 
 def _merge(base: Any, extra: Any) -> Any:
