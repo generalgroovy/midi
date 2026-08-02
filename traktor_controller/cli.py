@@ -32,6 +32,15 @@ def load_backend() -> Any:
     raise SystemExit("Traktor hardware backend not found; run install.sh.")
 
 
+def _mapping_signature(mapping: dict[str, Any]) -> str:
+    action = str(mapping.get("action", ""))
+    if action == "script_slot":
+        return f"script_slot:{mapping.get('slot', '')}"
+    if action in {"model_parameter_absolute", "model_parameter_relative"}:
+        return f"{action}:{mapping.get('parameter', '')}"
+    return action
+
+
 def validate_config(config: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if not isinstance(config.get("actions", {}), dict):
@@ -40,6 +49,10 @@ def validate_config(config: dict[str, Any]) -> list[str]:
     if not isinstance(mappings, list):
         return errors + ["mappings must be an array"]
     known_actions = set(config.get("actions", {})) | BUILTIN_ACTIONS
+    signatures: dict[tuple[str, str], int] = {}
+    enforce_unique = bool(config.get("layout_rules", {}).get(
+        "no_repeated_actions_per_controller", True
+    ))
     for index, mapping in enumerate(mappings):
         prefix = f"mappings[{index}]"
         if not isinstance(mapping, dict):
@@ -52,11 +65,34 @@ def validate_config(config: dict[str, Any]) -> list[str]:
             errors.append(f"{prefix} references unknown action {mapping['action']!r}")
         if mapping.get("kind") not in {"press", "release", "relative", "absolute", None}:
             errors.append(f"{prefix} has unsupported kind {mapping.get('kind')!r}")
+        if mapping.get("action") == "script_slot" and not mapping.get("slot"):
+            errors.append(f"{prefix} script_slot requires slot")
+        if mapping.get("action") in {"model_parameter_absolute", "model_parameter_relative"} and not mapping.get("parameter"):
+            errors.append(f"{prefix} model action requires parameter")
+        if enforce_unique and bool(mapping.get("enabled", True)):
+            key = (str(mapping.get("device", "")), _mapping_signature(mapping))
+            if key in signatures:
+                errors.append(
+                    f"{prefix} repeats {_mapping_signature(mapping)!r} on {key[0]} "
+                    f"(already mappings[{signatures[key]}])"
+                )
+            signatures[key] = index
+
+    parameters = config.get("model_controls", {}).get("parameters", {})
+    if not isinstance(parameters, dict):
+        errors.append("model_controls.parameters must be an object")
+    else:
+        for name, spec in parameters.items():
+            if not isinstance(spec, dict):
+                errors.append(f"model parameter {name!r} must be an object")
+                continue
+            if float(spec.get("max", 1)) <= float(spec.get("min", 0)):
+                errors.append(f"model parameter {name!r} max must exceed min")
     return errors
 
 
 def show_layout(config: dict[str, Any], profile: str | None) -> int:
-    selected = profile or str(config.get("active_profile", "desktop"))
+    selected = profile or str(config.get("active_profile", "linux-ops"))
     router = EventRouter(config, monitor=False, profile=selected, dry_run=True)
     print(f"Active profile: {selected}")
     details = config.get("profiles", {}).get(selected, {})
@@ -72,9 +108,21 @@ def show_layout(config: dict[str, Any], profile: str | None) -> int:
                 if value:
                     values = value if isinstance(value, list) else [value]
                     modifiers.append(f"{key}=" + ",".join(str(item) for item in values))
-            rows.append((device, control, kind, str(mapping["action"]), " ".join(modifiers)))
+            target = _mapping_signature(mapping)
+            rows.append((device, control, kind, target, " ".join(modifiers)))
     for device, control, kind, action, modifiers in sorted(rows):
-        print(f"{device:3} {control:26} {kind:8} -> {action}" + (f" [{modifiers}]" if modifiers else ""))
+        print(f"{device:3} {control:27} {kind:8} -> {action}" + (f" [{modifiers}]" if modifiers else ""))
+    return 0
+
+
+def show_model_state(config: dict[str, Any]) -> int:
+    path = Path(str(config.get("model_controls", {}).get(
+        "state_file", "~/.config/traktor-system-controller/model-controls.json"
+    ))).expanduser()
+    if not path.exists():
+        print(f"No model state yet: {path}")
+        return 1
+    print(path.read_text(encoding="utf-8"), end="")
     return 0
 
 
@@ -88,12 +136,35 @@ def main() -> int:
     parser.add_argument("--list-ports", action="store_true")
     parser.add_argument("--show-layout", action="store_true")
     parser.add_argument("--validate-config", action="store_true")
+    parser.add_argument("--approve-connected", action="store_true")
+    parser.add_argument("--deny-connected", action="store_true")
+    parser.add_argument("--forget-device-decisions", action="store_true")
+    parser.add_argument("--list-themes", action="store_true")
+    parser.add_argument("--set-theme")
+    parser.add_argument("--visual-theme")
+    parser.add_argument("--model-state", action="store_true")
     args = parser.parse_args()
 
     backend = load_backend()
     if args.list_devices or args.list_ports:
         return backend.list_devices()
     config = load_config(args.config)
+    if args.list_themes:
+        print("\n".join(sorted(backend.THEMES)))
+        return 0
+    if args.set_theme:
+        backend.set_theme(config, args.set_theme)
+        print(f"Visual theme set to {args.set_theme}. Restart the service to apply it.")
+        return 0
+    if args.approve_connected:
+        return backend.approve_connected(config, "always")
+    if args.deny_connected:
+        return backend.approve_connected(config, "never")
+    if args.forget_device_decisions:
+        return backend.forget_device_decisions(config)
+    if args.model_state:
+        return show_model_state(config)
+
     errors = validate_config(config)
     if args.validate_config:
         if errors:
@@ -106,8 +177,10 @@ def main() -> int:
         raise SystemExit("Invalid configuration:\n- " + "\n- ".join(errors))
     if args.show_layout:
         return show_layout(config, args.profile)
+
     runtime = backend.ControllerRuntime(
-        EventRouter(config, monitor=args.monitor, profile=args.profile, dry_run=args.dry_run)
+        EventRouter(config, monitor=args.monitor, profile=args.profile, dry_run=args.dry_run),
+        config=config, visual_theme=args.visual_theme,
     )
     try:
         runtime.run()
