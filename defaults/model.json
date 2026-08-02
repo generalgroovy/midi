@@ -2,7 +2,8 @@
   "model_controls": {
     "state_file": "~/.config/traktor-system-controller/model-controls.json",
     "hook": "~/.config/traktor-system-controller/hooks/model-controls-updated",
-    "notify": true,
+    "notify": false,
+    "debounce_ms": 250,
     "parameters": {
       "temperature": {"min": 0.0, "max": 2.0, "step": 0.01, "default": 0.7, "decimals": 2},
       "top_p": {"min": 0.05, "max": 1.0, "step": 0.01, "default": 0.9, "decimals": 2},
