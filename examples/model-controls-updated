@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Called after a model-control knob changes:
+#   $1 parameter name, $2 value, $3 complete JSON state file
+set -euo pipefail
+parameter="$1"
+value="$2"
+state_file="$3"
+
+mkdir -p "$HOME/.config/ollama"
+cp "$state_file" "$HOME/.config/ollama/system-controller-options.json"
+logger -t traktor-model-control "$parameter=$value"
+
+# Extend this hook to update an Ollama Modelfile, an OpenAI-compatible request
+# template, Aider flags, Odysseus settings, or another local agent configuration.
