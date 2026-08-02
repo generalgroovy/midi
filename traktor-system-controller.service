@@ -8,6 +8,8 @@ Type=simple
 ExecStart=%h/.local/bin/traktor-system-controller
 Restart=on-failure
 RestartSec=2
+KillSignal=SIGINT
+TimeoutStopSec=6
 Environment=PYTHONUNBUFFERED=1
 
 [Install]
