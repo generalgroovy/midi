@@ -1,79 +1,118 @@
 # Traktor X1/F1 Linux System Controller
 
-Use a Native Instruments Traktor Kontrol X1 MK1 and F1 as global desktop,
-media, audio and Sway controls on Garuda Linux.
+Turn a Native Instruments **Traktor Kontrol F1** and **X1 MK1** into two
+complementary Linux control surfaces for Garuda Sway:
 
-| Controller | USB ID | Backend |
-|---|---:|---|
-| X1 MK1 | `17cc:2305` | `snd-usb-caiaq` evdev |
-| F1 | `17cc:1120` | HID/hidapi |
+- **F1:** desktop flow, applications, workspaces, audio, display controls and
+  sixteen `SHIFT` script slots.
+- **X1:** system monitoring, maintenance, audio/network operations, eight local
+  model parameters and eight additional `SHIFT` script slots.
 
-## Visual default layout
+![Default layout overview](assets/default-layout-overview.svg)
 
-The repository contains complete action maps for both controllers. Colored
-controls have active defaults; gray controls are disabled or intentionally
-unmapped.
+The default profile deliberately avoids repeating an action signature on the
+same controller. Every mapped control has a distinct role.
 
-[![F1 default action map](assets/f1-default-actions.svg)](docs/VISUAL_MAPPING.md#traktor-kontrol-f1)
+## What it provides
 
-[![X1 MK1 default action map](assets/x1-default-actions.svg)](docs/VISUAL_MAPPING.md#traktor-kontrol-x1-mk1)
+- Native Wayland/Sway operation without keyboard emulation.
+- Graphical consent prompt when a controller connects: use once, always use,
+  ignore once or never use.
+- F1 RGB pad colors and press feedback.
+- X1 button LEDs and press feedback through the optional raw-USB backend.
+- Six visual themes: `category`, `neon`, `matrix`, `sunset`, `mono`, `blackout`.
+- Global audio, brightness, workspaces, launcher, clipboard, screenshot,
+  recording, display, Bluetooth and network controls.
+- System dashboards for processes, sensors, services, logs, disks, ports,
+  mounts, USB, timers, packages and power.
+- Configurable script slots for Codex, Ollama, Odysseus, Autocode, Aider,
+  OpenCode, FLUX2 and arbitrary executables.
+- Knob/fader-controlled model parameters persisted as JSON and forwarded to a
+  configurable hook.
+- Dry-run, event monitor, layout validation and duplicate-action checks.
 
-See [`docs/VISUAL_MAPPING.md`](docs/VISUAL_MAPPING.md) for the complete action,
-Shift-layer and configuration reference.
+## Supported hardware
 
-## Install or upgrade
+| Controller | USB ID | Default backend | Visual output |
+|---|---:|---|---|
+| Traktor Kontrol F1 | `17cc:1120` | HID/hidapi | RGB pads, buttons, play LEDs |
+| Traktor Kontrol X1 MK1 | `17cc:2305` | PyUSB raw mode | Button LEDs |
+| Traktor Kontrol X1 MK1 fallback | `17cc:2305` | `snd-usb-caiaq` evdev | Input only |
+
+Raw X1 mode temporarily detaches `snd-usb-caiaq`, reads the controller directly,
+drives its LEDs, and restores the kernel driver when the process exits. Set
+`hardware.x1_backend` to `evdev` to retain kernel-only input mode without LEDs.
+
+## Pull, install and run
+
+Use the included Fish script:
 
 ```fish
-cd ~/Projects
-if test -d midi/.git
-    cd midi
-    git pull --ff-only
-else
-    git clone https://github.com/generalgroovy/midi.git
-    cd midi
-end
+curl -L https://raw.githubusercontent.com/generalgroovy/midi/main/setup-and-run.fish \
+  -o /tmp/setup-midi.fish
+fish /tmp/setup-midi.fish
+```
+
+Or use an existing clone:
+
+```fish
+cd ~/Projects/midi
+git pull --ff-only
+sudo -v
 bash ./install.sh --reset-config
+systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP
+systemctl --user restart traktor-system-controller.service
 ```
 
-`--reset-config` backs up an existing configuration before activating the new
-default. Omit it to retain the current `config.json`.
+`--reset-config` backs up the current root configuration before activating the
+new defaults. Script-slot definitions and model hooks can then be edited in the
+installed configuration directory.
 
-Unplug and reconnect both controllers after installation.
+Unplug and reconnect both controllers after installation. A graphical prompt
+asks whether each connected unit should become a system controller.
 
-## Verify and test
+## Default F1 map
 
-```fish
-traktor-system-controller --list-devices
-traktor-system-controller --validate-config
-traktor-system-controller --show-layout
-systemctl --user stop traktor-system-controller.service
-traktor-system-controller --dry-run
-```
+[![F1 Linux operations map](assets/f1-linux-ops.svg)](docs/VISUAL_MAPPING.md#f1-desktop--script-surface)
 
-`--dry-run` reads both controllers and prints the command that each mapping
-would execute without running it. `--monitor` prints raw and semantic control
-events without matching actions.
+Normal pads control applications, workspaces and Linux desktop operations.
+Hold the physical F1 `SHIFT` button to access sixteen independent script slots.
+The knobs control audio, microphone, brightness and bass presets. The faders
+control Sway gaps and three local-model parameters.
 
-## Configuration
+## Default X1 map
 
-The active file is:
+[![X1 Linux operations map](assets/x1-linux-ops.svg)](docs/VISUAL_MAPPING.md#x1-system-operations--model-console)
+
+The eight upper knobs configure model generation values. The upper buttons
+open Ollama/Odysseus and system diagnostics. The center section handles audio,
+network, Bluetooth, Sway and package operations. The transport section exposes
+monitoring and maintenance tools.
+
+## Configuration model
+
+The active root is:
 
 ```text
 ~/.config/traktor-system-controller/config.json
 ```
 
-The default root includes modular files:
+It includes modular fragments:
 
 ```text
 ~/.config/traktor-system-controller/defaults/actions.json
+~/.config/traktor-system-controller/defaults/model.json
+~/.config/traktor-system-controller/defaults/scripts.json
+~/.config/traktor-system-controller/defaults/visuals.json
 ~/.config/traktor-system-controller/defaults/f1.json
 ~/.config/traktor-system-controller/defaults/x1.json
 ```
 
-Lists are concatenated and objects are recursively merged. Add overrides to
-`config.json`, edit the fragments, or replace the includes with your own files.
+Objects merge recursively and mapping lists concatenate. Keep the defaults
+unchanged and add overrides to `config.json`, or edit the installed fragments
+for a complete custom layout.
 
-Mappings use:
+A normal mapping:
 
 ```json
 {
@@ -85,52 +124,157 @@ Mappings use:
 }
 ```
 
-X1 kernel names are translated to physical names such as `deck_a_play`,
-`deck_b_browse_encoder`, `fx1_knob_1` and `shift`. A mapping can use layers:
+A script slot on the F1 Shift layer:
 
 ```json
 {
-  "device": "x1",
-  "control": "deck_a_play",
+  "device": "f1",
+  "control": "grid_2",
   "kind": "press",
-  "action": "previous_track",
-  "requires": "x1.shift"
+  "action": "script_slot",
+  "slot": "codex",
+  "requires": ["f1.shift"],
+  "enabled": true
 }
 ```
 
-Available command placeholders include `{home}`, `{device}`, `{control}`,
-`{raw_control}`, `{value}`, `{delta}`, `{ratio}` and `{percent}`.
+## Script slots
 
-See [`docs/LAYOUT.md`](docs/LAYOUT.md) for the compact table reference and
-[`docs/VISUAL_MAPPING.md`](docs/VISUAL_MAPPING.md) for the full visual reference.
+Edit `defaults/scripts.json`:
 
-## Default concept
+```json
+{
+  "script_slots": {
+    "codex": {
+      "label": "Codex CLI",
+      "enabled": true,
+      "command": ["foot", "fish", "-lc", "codex; exec fish"]
+    },
+    "my_backup": {
+      "label": "Run backup",
+      "enabled": true,
+      "confirm": "Run the backup now?",
+      "command": ["/home/otp/.local/bin/backup-projects"]
+    }
+  }
+}
+```
 
-The F1 is the application/workspace/audio pad surface. The X1 is the compact
-media and rotary-control surface. Both expose play/pause, track navigation,
-volume, brightness, workspace and application controls so either controller
-remains useful by itself.
+Disabled slots remain visible in the layout but execute nothing. Commands may
+be arrays or shell strings and support `{home}`, `{device}`, `{control}`,
+`{value}`, `{percent}`, `{slot}` and other event placeholders.
 
-## Service
+## Model-control knobs
+
+The default model parameters are:
+
+| Parameter | Range | Default control |
+|---|---:|---|
+| `temperature` | `0.00–2.00` | X1 FX1 Dry/Wet; F1 Fader 2 |
+| `top_p` | `0.05–1.00` | X1 FX1 Knob 1; F1 Fader 3 |
+| `repeat_penalty` | `0.80–1.50` | X1 FX1 Knob 2 |
+| `max_tokens` | `128–8192` | X1 FX1 Knob 3 |
+| `context_length` | `1024–32768` | X1 FX2 Dry/Wet; F1 Fader 4 |
+| `threads` | `1–8` | X1 FX2 Knob 1 |
+| `gpu_layers` | `0–80` | X1 FX2 Knob 2 |
+| `seed` | `0–9999` | X1 FX2 Knob 3 |
+
+Values are written atomically to:
+
+```text
+~/.config/traktor-system-controller/model-controls.json
+```
+
+After each change, the executable hook is called with:
+
+```text
+model-controls-updated PARAMETER VALUE STATE_FILE
+```
+
+The bundled hook copies the state to an Ollama-oriented JSON file. Replace it
+to update an Ollama Modelfile, an OpenAI-compatible request template, Aider,
+Odysseus, Autocode or another local-agent configuration.
+
+## Visual themes
+
+![Controller visual themes](assets/visual-themes.svg)
 
 ```fish
-systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP
+traktor-system-controller --list-themes
+traktor-system-controller --set-theme neon
 systemctl --user restart traktor-system-controller.service
+```
+
+F1 colors reflect action categories. X1 uses coordinated brightness because its
+LEDs are single-color. Pressed controls flash at full brightness.
+
+## Connection consent
+
+Default policy:
+
+```json
+{
+  "connection": {
+    "policy": "prompt",
+    "remember": true
+  }
+}
+```
+
+Manage decisions manually:
+
+```fish
+traktor-system-controller --approve-connected
+traktor-system-controller --deny-connected
+traktor-system-controller --forget-device-decisions
+```
+
+Set `policy` to `always`, `prompt` or `never`.
+
+## Validate and troubleshoot
+
+```fish
+traktor-system-controller --list-devices
+traktor-system-controller --validate-config
+traktor-system-controller --show-layout
+traktor-system-controller --model-state
+
+systemctl --user stop traktor-system-controller.service
+traktor-system-controller --dry-run
+traktor-system-controller --monitor
+
 journalctl --user -u traktor-system-controller.service -f
 ```
 
-Add to `~/.config/sway/config`:
+`--dry-run` reads real hardware and prints actions without executing them.
+`--monitor` prints normalized events without matching any actions.
 
-```text
-exec_always sh -lc 'systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP; systemctl --user restart traktor-system-controller.service'
-```
+Detailed references:
 
-## Validation
+- [`docs/LAYOUT.md`](docs/LAYOUT.md) — exact default bindings.
+- [`docs/VISUAL_MAPPING.md`](docs/VISUAL_MAPPING.md) — visual maps and LED themes.
+- [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) — overrides, script slots,
+  model knobs, connection policy and safety.
+- [`docs/SYSTEM_ACTIONS.md`](docs/SYSTEM_ACTIONS.md) — monitoring and maintenance
+  commands.
+
+## Safety
+
+- No passwordless `sudo` rule is installed.
+- Full system update opens an interactive terminal and asks for confirmation.
+- Reboot and power-off require a graphical confirmation.
+- Controllers remain inactive until connection consent is granted.
+- Unknown or disabled script slots do not execute.
+- X1 raw mode restores the kernel driver during normal shutdown.
+
+## Development validation
 
 ```bash
 python -m py_compile traktor-system-controller.py traktor-controller.py traktor_controller/*.py
 python -m unittest discover -s tests -v
-bash -n install.sh
+TRAKTOR_CONTROLLER_BACKEND=$PWD/traktor-system-controller.py \
+  python traktor-controller.py --config config.default.json --validate-config
+bash -n install.sh helpers/system-actions examples/model-controls-updated
 ```
 
 ## License
