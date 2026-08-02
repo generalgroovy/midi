@@ -8,6 +8,19 @@ media, audio and Sway controls on Garuda Linux.
 | X1 MK1 | `17cc:2305` | `snd-usb-caiaq` evdev |
 | F1 | `17cc:1120` | HID/hidapi |
 
+## Visual default layout
+
+The repository contains complete action maps for both controllers. Colored
+controls have active defaults; gray controls are disabled or intentionally
+unmapped.
+
+[![F1 default action map](assets/f1-default-actions.svg)](docs/VISUAL_MAPPING.md#traktor-kontrol-f1)
+
+[![X1 MK1 default action map](assets/x1-default-actions.svg)](docs/VISUAL_MAPPING.md#traktor-kontrol-x1-mk1)
+
+See [`docs/VISUAL_MAPPING.md`](docs/VISUAL_MAPPING.md) for the complete action,
+Shift-layer and configuration reference.
+
 ## Install or upgrade
 
 ```fish
@@ -88,7 +101,8 @@ X1 kernel names are translated to physical names such as `deck_a_play`,
 Available command placeholders include `{home}`, `{device}`, `{control}`,
 `{raw_control}`, `{value}`, `{delta}`, `{ratio}` and `{percent}`.
 
-See [docs/LAYOUT.md](docs/LAYOUT.md) for the complete default surface.
+See [`docs/LAYOUT.md`](docs/LAYOUT.md) for the compact table reference and
+[`docs/VISUAL_MAPPING.md`](docs/VISUAL_MAPPING.md) for the full visual reference.
 
 ## Default concept
 
