@@ -4,6 +4,7 @@ import json
 import os
 import struct
 import subprocess
+import select
 import threading
 import time
 from pathlib import Path
@@ -38,6 +39,7 @@ F1_ANALOG_OFFSETS = {
     "knob_1": 6, "knob_2": 8, "knob_3": 10, "knob_4": 12,
     "fader_1": 14, "fader_2": 16, "fader_3": 18, "fader_4": 20,
 }
+
 X1_BUTTONS: dict[str, tuple[int, int]] = {
     "deck_a_play": (0, 0), "deck_a_cue": (0, 1),
     "deck_a_beat_left": (0, 2), "deck_a_out": (0, 3),
@@ -257,7 +259,7 @@ def _event_code_name(ecodes: Any, event_type: int, code: int) -> str:
 
 def x1_evdev_worker(
     path: str, router: Any, config: dict[str, Any], theme: str,
-    release: Callable[[], None],
+    stop_event: threading.Event, release: Callable[[], None],
 ) -> None:
     del config, theme
     try:
@@ -266,30 +268,34 @@ def x1_evdev_worker(
         device = evdev.InputDevice(path)
         log(f"Connected X1 MK1 evdev fallback (LED feedback unavailable): {path}")
         previous_encoders: dict[str, int] = {}
-        for event in device.read_loop():
-            control = _event_code_name(ecodes, event.type, event.code)
-            if event.type == ecodes.EV_KEY:
-                if event.value in {0, 1}:
-                    router.emit(ControlEvent(
-                        "x1", control, "press" if event.value else "release",
-                        1 if event.value else 0, source=path,
-                    ))
-            elif event.type == ecodes.EV_ABS:
-                if control in X1_ENCODER_RAW_CODES:
-                    previous = previous_encoders.get(control)
-                    previous_encoders[control] = int(event.value)
-                    if previous is not None:
-                        delta = ((int(event.value) - previous + 8) % 16) - 8
-                        if delta:
-                            router.emit(ControlEvent(
-                                "x1", control, "relative", delta, -8, 7, path
-                            ))
-                else:
-                    info = device.absinfo(event.code)
-                    router.emit(ControlEvent(
-                        "x1", control, "absolute", int(event.value),
-                        int(info.min), int(info.max), path,
-                    ))
+        while not stop_event.is_set():
+            readable, _, _ = select.select([device.fd], [], [], 0.5)
+            if not readable:
+                continue
+            for event in device.read():
+                control = _event_code_name(ecodes, event.type, event.code)
+                if event.type == ecodes.EV_KEY:
+                    if event.value in {0, 1}:
+                        router.emit(ControlEvent(
+                            "x1", control, "press" if event.value else "release",
+                            1 if event.value else 0, source=path,
+                        ))
+                elif event.type == ecodes.EV_ABS:
+                    if control in X1_ENCODER_RAW_CODES:
+                        previous = previous_encoders.get(control)
+                        previous_encoders[control] = int(event.value)
+                        if previous is not None:
+                            delta = ((int(event.value) - previous + 8) % 16) - 8
+                            if delta:
+                                router.emit(ControlEvent(
+                                    "x1", control, "relative", delta, -8, 7, path
+                                ))
+                    else:
+                        info = device.absinfo(event.code)
+                        router.emit(ControlEvent(
+                            "x1", control, "absolute", int(event.value),
+                            int(info.min), int(info.max), path,
+                        ))
     except Exception as exc:
         log(f"X1 evdev backend ended: {path}: {exc}")
     finally:
@@ -298,7 +304,7 @@ def x1_evdev_worker(
 
 def x1_raw_worker(
     device: Any, router: Any, config: dict[str, Any], theme: str,
-    release: Callable[[], None],
+    stop_event: threading.Event, release: Callable[[], None],
 ) -> None:
     detached = False
     visual: X1Visual | None = None
@@ -318,7 +324,7 @@ def x1_raw_worker(
         previous_buttons: dict[str, bool] = {}
         previous_encoders: dict[str, int] = {}
         previous_analogs: dict[str, int] = {}
-        while True:
+        while not stop_event.is_set():
             try:
                 raw = bytes(device.read(0x84, 24, timeout=100))
             except Exception as exc:
@@ -378,7 +384,7 @@ def x1_raw_worker(
 
 def f1_worker(
     path: Any, router: Any, config: dict[str, Any], theme: str,
-    release: Callable[[], None],
+    stop_event: threading.Event, release: Callable[[], None],
 ) -> None:
     device = None
     visual: F1Visual | None = None
@@ -393,8 +399,8 @@ def f1_worker(
         previous_buttons: int | None = None
         previous_encoder: int | None = None
         previous_analog: dict[str, int] = {}
-        while True:
-            raw = device.read(64, 1000)
+        while not stop_event.is_set():
+            raw = device.read(64, 500)
             if not raw:
                 continue
             report = _normalize_f1_report(raw)
@@ -455,6 +461,8 @@ class ControllerRuntime:
         self.ignored: set[tuple[str, str]] = set()
         self.present: set[tuple[str, str]] = set()
         self.lock = threading.Lock()
+        self.stop_event = threading.Event()
+        self.threads: dict[tuple[str, str], threading.Thread] = {}
 
     def _start(
         self, key: tuple[str, str], label: str,
@@ -476,11 +484,14 @@ class ControllerRuntime:
                 self.active.discard(key)
                 self.ignored.add(key)
 
-        threading.Thread(
+        thread = threading.Thread(
             target=target,
-            args=(*args, self.router, self.config, self.theme, release),
+            args=(*args, self.router, self.config, self.theme, self.stop_event, release),
             daemon=True,
-        ).start()
+        )
+        with self.lock:
+            self.threads[key] = thread
+        thread.start()
 
     def run(self) -> None:
         hardware = self.config.get("hardware", {})
@@ -491,35 +502,42 @@ class ControllerRuntime:
             "Watching for Traktor controllers. "
             f"theme={self.theme} x1_backend={x1_backend}. Ctrl+C stops."
         )
-        while True:
-            current: set[tuple[str, str]] = set()
-            raw_x1 = discover_x1_usb_devices() if x1_backend == "raw_usb" else []
-            for device in raw_x1:
-                identity = _x1_identifier(device)
-                key = ("x1", identity)
-                current.add(key)
-                self._start(key, "Traktor Kontrol X1 MK1", x1_raw_worker, device)
-            if x1_backend == "evdev" or (fallback and not raw_x1):
-                for path, _name in discover_x1_evdev_devices():
-                    key = ("x1", path)
+        try:
+            while not self.stop_event.is_set():
+                current: set[tuple[str, str]] = set()
+                raw_x1 = discover_x1_usb_devices() if x1_backend == "raw_usb" else []
+                for device in raw_x1:
+                    identity = _x1_identifier(device)
+                    key = ("x1", identity)
                     current.add(key)
-                    self._start(
-                        key, "Traktor Kontrol X1 MK1 (evdev fallback)",
-                        x1_evdev_worker, path,
-                    )
-            for info in discover_f1_devices():
-                path = info.get("path")
-                if path is None:
-                    continue
-                identity = _hid_path_text(path)
-                key = ("f1", identity)
-                current.add(key)
-                self._start(key, "Traktor Kontrol F1", f1_worker, path)
+                    self._start(key, "Traktor Kontrol X1 MK1", x1_raw_worker, device)
+                if x1_backend == "evdev" or (fallback and not raw_x1):
+                    for path, _name in discover_x1_evdev_devices():
+                        key = ("x1", path)
+                        current.add(key)
+                        self._start(
+                            key, "Traktor Kontrol X1 MK1 (evdev fallback)",
+                            x1_evdev_worker, path,
+                        )
+                for info in discover_f1_devices():
+                    path = info.get("path")
+                    if path is None:
+                        continue
+                    identity = _hid_path_text(path)
+                    key = ("f1", identity)
+                    current.add(key)
+                    self._start(key, "Traktor Kontrol F1", f1_worker, path)
+                with self.lock:
+                    disconnected = self.present - current
+                    self.ignored.difference_update(disconnected)
+                    self.present = current
+                self.stop_event.wait(2.0)
+        finally:
+            self.stop_event.set()
             with self.lock:
-                disconnected = self.present - current
-                self.ignored.difference_update(disconnected)
-                self.present = current
-            time.sleep(2.0)
+                threads = list(self.threads.values())
+            for thread in threads:
+                thread.join(timeout=2.0)
 
 
 def list_devices() -> int:
