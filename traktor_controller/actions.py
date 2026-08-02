@@ -5,6 +5,7 @@ import math
 import os
 import shutil
 import subprocess
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,7 @@ class ActionDispatcher:
         self.notify_actions = bool(config.get("runtime", {}).get("notify_actions", False))
         self.dry_run = dry_run
         self.last_bass_index: int | None = None
+        self.model_hook_timers: dict[str, threading.Timer] = {}
 
     @staticmethod
     def normalized_value(event: ControlEvent, invert: bool = False) -> float:
@@ -114,12 +116,51 @@ class ActionDispatcher:
         ))).expanduser()
 
     def _read_model_state(self) -> dict[str, Any]:
+        parameters = self.model_controls.get("parameters", {})
+        defaults = {
+            str(name): spec.get("default")
+            for name, spec in parameters.items()
+            if isinstance(spec, dict) and "default" in spec
+        } if isinstance(parameters, dict) else {}
         path = self._model_state_path()
         try:
             value = json.loads(path.read_text(encoding="utf-8"))
-            return value if isinstance(value, dict) else {}
+            if isinstance(value, dict):
+                defaults.update(value)
         except (FileNotFoundError, json.JSONDecodeError):
-            return {}
+            pass
+        return defaults
+
+    def _schedule_model_hook(
+        self, parameter: str, value: float, path: Path
+    ) -> None:
+        hook = str(self.model_controls.get("hook", "")).strip()
+        notify = bool(self.model_controls.get("notify", False))
+        if not hook and not notify:
+            return
+        previous = self.model_hook_timers.pop(parameter, None)
+        if previous:
+            previous.cancel()
+        delay = max(
+            0.05, float(self.model_controls.get("debounce_ms", 250)) / 1000.0
+        )
+
+        def fire() -> None:
+            if hook:
+                hook_path = Path(hook).expanduser()
+                if hook_path.exists() and os.access(hook_path, os.X_OK):
+                    self._run(
+                        [str(hook_path), parameter, str(value), str(path)],
+                        f"model_hook:{parameter}",
+                    )
+            if notify:
+                self._notify("Model control", f"{parameter} = {value}")
+            self.model_hook_timers.pop(parameter, None)
+
+        timer = threading.Timer(delay, fire)
+        timer.daemon = True
+        self.model_hook_timers[parameter] = timer
+        timer.start()
 
     def _set_model_parameter(self, mapping: dict[str, Any], event: ControlEvent,
                              relative: bool) -> None:
@@ -151,14 +192,7 @@ class ActionDispatcher:
         if self.dry_run:
             return
         atomic_write_json(path, state)
-        hook = str(self.model_controls.get("hook", "")).strip()
-        if hook:
-            hook_path = Path(hook).expanduser()
-            if hook_path.exists() and os.access(hook_path, os.X_OK):
-                self._run([str(hook_path), parameter, str(value), str(path)],
-                          f"model_hook:{parameter}")
-        if bool(self.model_controls.get("notify", True)):
-            self._notify("Model control", f"{parameter} = {value}")
+        self._schedule_model_hook(parameter, value, path)
 
     def _run_script_slot(self, mapping: dict[str, Any], event: ControlEvent) -> None:
         slot = str(mapping.get("slot", "")).strip()
