@@ -1,157 +1,62 @@
 {
   "control_aliases": {
     "x1": {
-      "BTN_0": "deck_a_play",
-      "BTN_1": "deck_a_cue",
-      "BTN_2": "deck_a_beat_left",
-      "BTN_3": "deck_a_out",
-      "BTN_8": "deck_a_fx2",
-      "BTN_9": "deck_a_fx1",
-      "BTN_12": "deck_b_in",
-      "BTN_13": "deck_b_beat_right",
-      "BTN_14": "deck_b_cup",
-      "BTN_15": "deck_b_sync",
-      "BTN_16": "deck_b_play",
-      "BTN_17": "deck_b_cue",
-      "BTN_18": "deck_b_beat_left",
-      "BTN_19": "deck_b_out",
-      "BTN_20": "deck_a_in",
-      "BTN_21": "deck_a_beat_right",
-      "BTN_22": "deck_a_cup",
-      "BTN_23": "deck_a_sync",
-      "BTN_24": "deck_a_browse_button",
-      "BTN_25": "deck_b_browse_button",
-      "BTN_26": "deck_a_loop_button",
-      "BTN_27": "deck_b_loop_button",
-      "BTN_28": "fx1_on",
-      "BTN_29": "fx1_button_1",
-      "BTN_30": "fx1_button_2",
-      "BTN_31": "fx1_button_3",
-      "BTN_32": "fx2_on",
-      "BTN_33": "fx2_button_1",
-      "BTN_34": "fx2_button_2",
-      "BTN_35": "fx2_button_3",
-      "BTN_36": "shift",
-      "BTN_37": "deck_b_fx2",
-      "BTN_38": "deck_b_fx1",
-      "BTN_39": "hotcue",
-      "ABS_X": "deck_a_browse_encoder",
-      "ABS_Y": "deck_b_browse_encoder",
-      "ABS_Z": "deck_a_loop_encoder",
-      "ABS_MISC": "deck_b_loop_encoder",
-      "ABS_HAT0X": "fx1_dry_wet",
-      "ABS_HAT0Y": "fx2_dry_wet",
-      "ABS_HAT1X": "fx1_knob_1",
-      "ABS_HAT1Y": "fx2_knob_1",
-      "ABS_HAT2X": "fx1_knob_2",
-      "ABS_HAT2Y": "fx2_knob_2",
-      "ABS_HAT3X": "fx1_knob_3",
-      "ABS_HAT3Y": "fx2_knob_3"
+      "BTN_0": "deck_a_play", "BTN_1": "deck_a_cue", "BTN_2": "deck_a_beat_left", "BTN_3": "deck_a_out", "BTN_8": "deck_a_fx2", "BTN_9": "deck_a_fx1", "BTN_12": "deck_b_in", "BTN_13": "deck_b_beat_right", "BTN_14": "deck_b_cup", "BTN_15": "deck_b_sync", "BTN_16": "deck_b_play", "BTN_17": "deck_b_cue", "BTN_18": "deck_b_beat_left", "BTN_19": "deck_b_out", "BTN_20": "deck_a_in", "BTN_21": "deck_a_beat_right", "BTN_22": "deck_a_cup", "BTN_23": "deck_a_sync", "BTN_24": "deck_a_browse_button", "BTN_25": "deck_b_browse_button", "BTN_26": "deck_a_loop_button", "BTN_27": "deck_b_loop_button", "BTN_28": "fx1_on", "BTN_29": "fx1_button_1", "BTN_30": "fx1_button_2", "BTN_31": "fx1_button_3", "BTN_32": "fx2_on", "BTN_33": "fx2_button_1", "BTN_34": "fx2_button_2", "BTN_35": "fx2_button_3", "BTN_36": "shift", "BTN_37": "deck_b_fx2", "BTN_38": "deck_b_fx1", "BTN_39": "hotcue", "ABS_X": "deck_a_browse_encoder", "ABS_Y": "deck_b_browse_encoder", "ABS_Z": "deck_a_loop_encoder", "ABS_MISC": "deck_b_loop_encoder", "ABS_HAT0X": "fx1_dry_wet", "ABS_HAT0Y": "fx2_dry_wet", "ABS_HAT1X": "fx1_knob_1", "ABS_HAT1Y": "fx2_knob_1", "ABS_HAT2X": "fx1_knob_2", "ABS_HAT2Y": "fx2_knob_2", "ABS_HAT3X": "fx1_knob_3", "ABS_HAT3Y": "fx2_knob_3"
     }
   },
   "actions": {
-    "browser": [
-      "xdg-open",
-      "https://www.google.com"
-    ],
-    "terminal": [
-      "foot"
-    ],
-    "files": [
-      "xdg-open",
-      "{home}"
-    ],
-    "launcher": [
-      "wofi",
-      "--show",
-      "drun"
-    ],
-    "play_pause": [
-      "playerctl",
-      "play-pause"
-    ],
-    "next_track": [
-      "playerctl",
-      "next"
-    ],
-    "previous_track": [
-      "playerctl",
-      "previous"
-    ],
-    "mute_output": [
-      "wpctl",
-      "set-mute",
-      "@DEFAULT_AUDIO_SINK@",
-      "toggle"
-    ],
-    "mute_microphone": [
-      "wpctl",
-      "set-mute",
-      "@DEFAULT_AUDIO_SOURCE@",
-      "toggle"
-    ],
-    "workspace_1": [
-      "swaymsg",
-      "workspace",
-      "number",
-      "1"
-    ],
-    "workspace_2": [
-      "swaymsg",
-      "workspace",
-      "number",
-      "2"
-    ],
-    "workspace_3": [
-      "swaymsg",
-      "workspace",
-      "number",
-      "3"
-    ],
-    "workspace_4": [
-      "swaymsg",
-      "workspace",
-      "number",
-      "4"
-    ],
-    "workspace_next": [
-      "swaymsg",
-      "workspace",
-      "next"
-    ],
-    "workspace_previous": [
-      "swaymsg",
-      "workspace",
-      "prev"
-    ],
-    "audio_controls": [
-      "pavucontrol"
-    ],
-    "audio_effects": [
-      "easyeffects"
-    ],
-    "lock_screen": [
-      "swaylock",
-      "-f"
-    ],
-    "screenshot": "mkdir -p \"$HOME/Pictures/Screenshots\" && grim -g \"$(slurp)\" \"$HOME/Pictures/Screenshots/$(date +%Y%m%d-%H%M%S).png\"",
-    "custom_script": [
-      "{home}/.local/bin/traktor-custom-action",
-      "{device}",
-      "{control}",
-      "{kind}",
-      "{value}",
-      "{percent}"
-    ]
+    "browser": ["xdg-open", "https://www.google.com"],
+    "terminal": ["foot"],
+    "files": ["xdg-open", "{home}"],
+    "projects": ["foot", "--working-directory={home}/Projects"],
+    "app_launcher": ["wofi", "--show", "drun"],
+    "window_switcher": ["wofi", "--show", "window"],
+    "clipboard_history": "{home}/.local/lib/traktor-system-controller/helpers/system-actions clipboard-history",
+    "display_settings": ["wdisplays"],
+    "notification_center": "{home}/.local/lib/traktor-system-controller/helpers/system-actions notifications",
+    "network_settings": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "network-settings"],
+    "bluetooth_settings": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "bluetooth-settings"],
+    "audio_controls": ["pavucontrol"],
+    "audio_graph": ["qpwgraph"],
+    "system_dashboard": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "dashboard"],
+    "controller_config": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "controller-config"],
+    "controller_layout": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "controller-layout"],
+    "controller_logs": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "controller-logs"],
+    "lock_screen": ["swaylock", "-f"],
+    "screenshot": "{home}/.local/lib/traktor-system-controller/helpers/system-actions screenshot",
+    "screen_record_toggle": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "screen-record-toggle"],
+    "play_pause": ["playerctl", "play-pause"],
+    "previous_track": ["playerctl", "previous"],
+    "next_track": ["playerctl", "next"],
+    "mute_output": ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"],
+    "model_state_view": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "model-state"],
+    "ollama_status": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "ollama-status"],
+    "ollama_models": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "ollama-models"],
+    "odysseus_open": ["xdg-open", "http://127.0.0.1:7000"],
+    "journal_errors": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "journal-errors"],
+    "failed_services": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "failed-services"],
+    "disk_usage": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "disk-usage"],
+    "system_info": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "system-info"],
+    "sensors": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "sensors"],
+    "network_monitor": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "network-monitor"],
+    "open_ports": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "open-ports"],
+    "kernel_log": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "kernel-log"],
+    "top_processes": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "top-processes"],
+    "usb_devices": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "usb-devices"],
+    "mounts": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "mounts"],
+    "orphan_packages": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "orphan-packages"],
+    "package_cache": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "package-cache"],
+    "user_services": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "user-services"],
+    "system_timers": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "system-timers"],
+    "power_menu": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "power-menu"],
+    "controller_restart": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "controller-restart"],
+    "sway_reload": ["swaymsg", "reload"],
+    "package_updates": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "package-updates"],
+    "system_update": ["{home}/.local/lib/traktor-system-controller/helpers/system-actions", "system-update"],
+    "workspace_1": ["swaymsg", "workspace", "number", "1"],
+    "workspace_2": ["swaymsg", "workspace", "number", "2"],
+    "workspace_3": ["swaymsg", "workspace", "number", "3"],
+    "workspace_4": ["swaymsg", "workspace", "number", "4"]
   },
-  "bass_presets": [
-    "Bass-0",
-    "Bass-1",
-    "Bass-2",
-    "Bass-3",
-    "Bass-4",
-    "Bass-5",
-    "Bass-6",
-    "Bass-7"
-  ]
+  "bass_presets": ["Bass-0", "Bass-1", "Bass-2", "Bass-3", "Bass-4", "Bass-5", "Bass-6", "Bass-7"]
 }
