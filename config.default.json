@@ -1,0 +1,20 @@
+{
+  "schema_version": 2,
+  "include": [
+    "defaults/actions.json",
+    "defaults/f1.json",
+    "defaults/x1.json"
+  ],
+  "active_profile": "desktop",
+  "profiles": {
+    "desktop": {
+      "description": "Basic global desktop, media, audio and Sway controls for X1 MK1 and F1."
+    },
+    "blank": {
+      "description": "No mappings; use for learning or building a layout from scratch."
+    }
+  },
+  "runtime": {
+    "log_actions": true
+  }
+}
