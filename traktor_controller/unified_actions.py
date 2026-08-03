@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 import threading
 from typing import Any
 
@@ -62,12 +63,29 @@ class ActionDispatcher(BaseActionDispatcher):
         kelvin = round(minimum + ratio * (maximum - minimum))
         method = str(mapping.get("adjustment_method", "wayland"))
         delay = max(0.05, float(mapping.get("debounce_ms", 180)) / 1000.0)
-        command = ["gammastep", "-P", "-m", method, "-O", str(kelvin)]
+        takeover = bool(mapping.get("take_ownership", True))
+        reset_at_max = bool(mapping.get("reset_at_max", True))
+
+        prefix = ""
+        if takeover:
+            prefix = (
+                "pkill -x gammastep 2>/dev/null || true; "
+                "pkill -x wlsunset 2>/dev/null || true; "
+            )
+        quoted_method = shlex.quote(method)
+        if reset_at_max and ratio >= 0.995:
+            command = prefix + f"exec gammastep -m {quoted_method} -x"
+        else:
+            command = (
+                prefix
+                + f"exec gammastep -P -m {quoted_method} -O {int(kelvin)}"
+            )
 
         if self.log_actions or self.dry_run:
             log(
                 f"action=color_temperature_absolute kelvin={kelvin} "
-                f"method={method} debounce_ms={round(delay * 1000)}"
+                f"method={method} takeover={takeover} "
+                f"debounce_ms={round(delay * 1000)}"
             )
         if self.dry_run:
             self._run(command, "color_temperature_absolute")
