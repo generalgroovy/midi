@@ -15,7 +15,7 @@ fi
 
 sudo pacman -S --needed \
   python python-evdev python-hidapi python-pyusb playerctl libnotify wireplumber \
-  brightnessctl easyeffects usbutils hid-tools evtest xdg-utils jq \
+  brightnessctl gammastep easyeffects usbutils hid-tools evtest xdg-utils jq \
   foot wofi zenity grim slurp pavucontrol swaylock qpwgraph \
   btop ncdu bmon fastfetch lm_sensors cliphist wl-clipboard wf-recorder \
   wdisplays blueman pacman-contrib
