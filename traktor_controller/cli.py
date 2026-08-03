@@ -9,6 +9,7 @@ from typing import Any
 
 from .common import BUILTIN_ACTIONS, DEFAULT_CONFIG, load_config
 from .router import EventRouter
+from .unified_actions import ActionDispatcher
 
 
 def load_backend() -> Any:
@@ -77,7 +78,6 @@ def validate_config(config: dict[str, Any]) -> list[str]:
                     f"(already mappings[{signatures[key]}])"
                 )
             signatures[key] = index
-
     parameters = config.get("model_controls", {}).get("parameters", {})
     if not isinstance(parameters, dict):
         errors.append("model_controls.parameters must be an object")
@@ -108,8 +108,7 @@ def show_layout(config: dict[str, Any], profile: str | None) -> int:
                 if value:
                     values = value if isinstance(value, list) else [value]
                     modifiers.append(f"{key}=" + ",".join(str(item) for item in values))
-            target = _mapping_signature(mapping)
-            rows.append((device, control, kind, target, " ".join(modifiers)))
+            rows.append((device, control, kind, _mapping_signature(mapping), " ".join(modifiers)))
     for device, control, kind, action, modifiers in sorted(rows):
         print(f"{device:3} {control:27} {kind:8} -> {action}" + (f" [{modifiers}]" if modifiers else ""))
     return 0
@@ -143,12 +142,45 @@ def main() -> int:
     parser.add_argument("--set-theme")
     parser.add_argument("--visual-theme")
     parser.add_argument("--model-state", action="store_true")
+    parser.add_argument("--gui", action="store_true")
+    parser.add_argument("--set-brightness", type=int, metavar="PERCENT")
+    parser.add_argument("--set-temperature", type=int, metavar="KELVIN")
+    parser.add_argument("--diagnose-display", action="store_true")
     args = parser.parse_args()
+
+    if args.gui:
+        from .gui import main as gui_main
+        return gui_main()
+
+    config = load_config(args.config)
+    errors = validate_config(config)
+    if args.validate_config:
+        if errors:
+            for error in errors:
+                print(f"ERROR: {error}", file=sys.stderr)
+            return 1
+        print(f"Configuration valid: {args.config}")
+        return 0
+    if errors:
+        raise SystemExit("Invalid configuration:\n- " + "\n- ".join(errors))
+
+    dispatcher = ActionDispatcher(config)
+    if args.set_brightness is not None:
+        return 0 if dispatcher.set_brightness_percent(args.set_brightness) else 1
+    if args.set_temperature is not None:
+        return 0 if dispatcher.set_color_temperature_kelvin(args.set_temperature) else 1
+    if args.diagnose_display:
+        for line in dispatcher.diagnose_displays():
+            print(line)
+        return 0
+    if args.model_state:
+        return show_model_state(config)
+    if args.show_layout:
+        return show_layout(config, args.profile)
 
     backend = load_backend()
     if args.list_devices or args.list_ports:
         return backend.list_devices()
-    config = load_config(args.config)
     if args.list_themes:
         print("\n".join(sorted(backend.THEMES)))
         return 0
@@ -162,21 +194,6 @@ def main() -> int:
         return backend.approve_connected(config, "never")
     if args.forget_device_decisions:
         return backend.forget_device_decisions(config)
-    if args.model_state:
-        return show_model_state(config)
-
-    errors = validate_config(config)
-    if args.validate_config:
-        if errors:
-            for error in errors:
-                print(f"ERROR: {error}", file=sys.stderr)
-            return 1
-        print(f"Configuration valid: {args.config}")
-        return 0
-    if errors:
-        raise SystemExit("Invalid configuration:\n- " + "\n- ".join(errors))
-    if args.show_layout:
-        return show_layout(config, args.profile)
 
     runtime = backend.ControllerRuntime(
         EventRouter(config, monitor=args.monitor, profile=args.profile, dry_run=args.dry_run),
@@ -187,3 +204,4 @@ def main() -> int:
     except KeyboardInterrupt:
         print()
         return 0
+    return 0
