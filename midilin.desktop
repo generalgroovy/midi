@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=MIDILIN Controller Console
+Comment=Configure and monitor Traktor F1/X1 Linux system controls
+Exec=midilin-gui
+Icon=preferences-desktop-peripherals
+Terminal=false
+Categories=Settings;Utility;AudioVideo;
+StartupNotify=true
