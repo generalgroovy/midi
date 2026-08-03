@@ -11,8 +11,15 @@ BUILTIN_ACTIONS = {
     "volume_absolute", "volume_relative",
     "source_volume_absolute", "source_volume_relative",
     "brightness_absolute", "brightness_relative",
+    "hardware_light_absolute",
     "bass_preset_absolute", "media_seek_relative", "workspace_relative",
     "sway_gap_absolute", "model_parameter_absolute", "model_parameter_relative",
+    "window_x_absolute", "window_y_absolute",
+    "window_width_absolute", "window_height_absolute",
+    "window_opacity_absolute", "window_border_absolute",
+    "window_output_absolute",
+    "window_focus_horizontal_relative", "window_focus_vertical_relative",
+    "window_move_horizontal_relative", "window_move_vertical_relative",
     "script_slot",
 }
 
@@ -55,7 +62,9 @@ def atomic_write_json(path: Path, value: Any) -> None:
     path = path.expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
-    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.write_text(
+        json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     temporary.replace(path)
 
 
