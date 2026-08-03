@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from .actions import ActionDispatcher
+from .advanced_actions import ActionDispatcher
 from .common import ControlEvent, X1_DEFAULT_ALIASES, log
 
 
