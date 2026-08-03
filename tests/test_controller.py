@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -72,6 +73,35 @@ class ControllerTests(unittest.TestCase):
                 signatures.append(action)
             self.assertEqual(len(signatures), len(set(signatures)), device)
 
+    def test_required_high_value_bindings(self) -> None:
+        config = load_config(Path("config.default.json"))
+        bindings = {
+            (m["device"], m["control"], m["kind"]): m["action"]
+            for m in config["mappings"]
+            if m.get("enabled", True) and not m.get("requires")
+        }
+        self.assertEqual(
+            "controller_brightness_absolute",
+            bindings[("f1", "knob_4", "absolute")],
+        )
+        self.assertEqual(
+            "close_focused_window",
+            bindings[("f1", "grid_16", "press")],
+        )
+        self.assertEqual(
+            "window_move_horizontal_relative",
+            bindings[("x1", "deck_a_browse_encoder", "relative")],
+        )
+        self.assertEqual(
+            "window_resize_height_relative",
+            bindings[("x1", "deck_b_loop_encoder", "relative")],
+        )
+        close_bindings = [
+            m for m in config["mappings"]
+            if m.get("enabled", True) and m.get("action") == "close_focused_window"
+        ]
+        self.assertEqual(1, len(close_bindings))
+
     def test_x1_alias_and_shift_layer(self) -> None:
         config = {"actions": {"normal": ["true"], "shifted": ["true"]}, "mappings": [
             {"device": "x1", "control": "deck_a_play", "kind": "press", "action": "normal", "unless": "x1.shift"},
@@ -92,52 +122,115 @@ class ControllerTests(unittest.TestCase):
                 "model_controls": {
                     "state_file": str(path), "notify": False,
                     "parameters": {
-                        "temperature": {"min": 0.0, "max": 2.0, "step": 0.01, "default": 0.7, "decimals": 2}
+                        "temperature": {
+                            "min": 0.0, "max": 2.0, "step": 0.01,
+                            "default": 0.7, "decimals": 2,
+                        }
                     },
                 },
             }
             dispatcher = ActionDispatcher(config)
-            event = SimpleNamespace(device="f1", control="fader_2", raw_control="fader_2", kind="absolute", value=2048, minimum=0, maximum=4096)
-            dispatcher.dispatch({"action": "model_parameter_absolute", "parameter": "temperature"}, event)
+            event = SimpleNamespace(
+                device="x1", control="fx1_dry_wet",
+                raw_control="fx1_dry_wet", kind="absolute",
+                value=2048, minimum=0, maximum=4096,
+            )
+            dispatcher.dispatch(
+                {"action": "model_parameter_absolute", "parameter": "temperature"},
+                event,
+            )
             state = json.loads(path.read_text())
             self.assertEqual(1.0, state["temperature"])
+
+    def test_controller_brightness_persistence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "brightness"
+            config = {
+                "runtime": {"log_actions": False},
+                "visuals": {"brightness_state_file": str(path)},
+            }
+            dispatcher = ActionDispatcher(config)
+            event = SimpleNamespace(
+                device="f1", control="knob_4", raw_control="knob_4",
+                kind="absolute", value=1024, minimum=0, maximum=4096,
+            )
+            dispatcher.dispatch({"action": "controller_brightness_absolute"}, event)
+            self.assertEqual("25", path.read_text().strip())
 
     def test_script_slot_dry_run(self) -> None:
         config = {
             "runtime": {"log_actions": False},
-            "script_slots": {"codex": {"enabled": True, "command": ["echo", "{slot}", "{control}"]}},
+            "script_slots": {
+                "codex": {
+                    "enabled": True,
+                    "command": ["echo", "{slot}", "{control}"],
+                }
+            },
         }
         dispatcher = ActionDispatcher(config, dry_run=True)
-        event = SimpleNamespace(device="f1", control="grid_2", raw_control="grid_2", kind="press", value=1, minimum=0, maximum=1)
+        event = SimpleNamespace(
+            device="f1", control="grid_2", raw_control="grid_2",
+            kind="press", value=1, minimum=0, maximum=1,
+        )
         rendered = dispatcher._render(
-            dispatcher.script_slots["codex"]["command"], event, {"slot": "codex"}
+            dispatcher.script_slots["codex"]["command"],
+            event, {"slot": "codex"},
         )
         self.assertEqual(["echo", "codex", "grid_2"], rendered)
 
     def test_f1_visual_packet_and_press_feedback(self) -> None:
         backend = load_backend()
-        config = load_config(Path("config.default.json"))
-        device = FakeHid()
-        visual = backend.F1Visual(device, config, "category")
-        self.assertEqual(0x80, device.writes[-1][0])
-        self.assertEqual(81, len(device.writes[-1]))
-        visual.feedback("grid_1", True)
-        packet = device.writes[-1]
-        self.assertEqual((127, 127, 127), (packet[26], packet[27], packet[25]))
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config(Path("config.default.json"))
+            config["visuals"]["brightness_state_file"] = str(Path(directory) / "brightness")
+            device = FakeHid()
+            visual = backend.F1Visual(device, config, "category")
+            self.assertEqual(0x80, device.writes[-1][0])
+            self.assertEqual(81, len(device.writes[-1]))
+            visual.feedback("grid_1", True)
+            packet = device.writes[-1]
+            self.assertEqual((127, 127, 127), (packet[26], packet[27], packet[25]))
+            visual.clear()
+
+    def test_live_visual_brightness_scaling(self) -> None:
+        backend = load_backend()
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / "brightness"
+            state.write_text("50\n")
+            config = load_config(Path("config.default.json"))
+            config["visuals"]["brightness_state_file"] = str(state)
+            device = FakeHid()
+            visual = backend.F1Visual(device, config, "category")
+            visual.feedback("grid_1", True)
+            packet = device.writes[-1]
+            self.assertEqual((64, 64, 64), (packet[26], packet[27], packet[25]))
+            state.write_text("25\n")
+            time.sleep(0.2)
+            packet = device.writes[-1]
+            self.assertLessEqual(max(packet[25:28]), 32)
+            visual.clear()
 
     def test_x1_visual_led_write(self) -> None:
         backend = load_backend()
-        config = load_config(Path("config.default.json"))
-        device = FakeUsb()
-        visual = backend.X1Visual(device, config, "neon")
-        self.assertEqual(0x01, device.writes[-1][0])
-        visual.feedback("deck_a_play", True)
-        self.assertEqual(127, device.writes[-1][1][24])
+        with tempfile.TemporaryDirectory() as directory:
+            config = load_config(Path("config.default.json"))
+            config["visuals"]["brightness_state_file"] = str(Path(directory) / "brightness")
+            device = FakeUsb()
+            visual = backend.X1Visual(device, config, "neon")
+            self.assertEqual(0x01, device.writes[-1][0])
+            visual.feedback("deck_a_play", True)
+            self.assertEqual(127, device.writes[-1][1][24])
+            visual.clear()
 
     def test_connection_always_policy(self) -> None:
         backend = load_backend()
         with tempfile.TemporaryDirectory() as directory:
-            config = {"connection": {"policy": "always", "state_file": str(Path(directory) / "devices.json")}}
+            config = {
+                "connection": {
+                    "policy": "always",
+                    "state_file": str(Path(directory) / "devices.json"),
+                }
+            }
             consent = backend.ConnectionConsent(config)
             self.assertTrue(consent.allowed("x1", "X1"))
 
