@@ -3,43 +3,30 @@
 ## Root and includes
 
 The active root is `~/.config/traktor-system-controller/config.json`. Included
-objects merge recursively and arrays concatenate. A minimal override can contain
-only the fields that differ from the defaults.
+objects merge recursively and mapping arrays concatenate.
 
-## Override an action
+Default fragments:
 
-```json
-{
-  "actions": {
-    "browser": ["firefox", "--new-window", "https://github.com"]
-  }
-}
+```text
+defaults/actions.json
+defaults/model.json
+defaults/scripts.json
+defaults/visuals.json
+defaults/f1.json
+defaults/x1.json
 ```
 
-## Add a mapping
+## Duplicate-action rule
 
-```json
-{
-  "mappings": [
-    {
-      "profile": "linux-ops",
-      "device": "f1",
-      "control": "grid_1",
-      "kind": "press",
-      "action": "browser",
-      "enabled": true
-    }
-  ]
-}
+The default validator rejects repeated enabled action signatures on the same
+controller. Parameterized actions include their target in the signature:
+
+```text
+script_slot:codex
+model_parameter_absolute:temperature
 ```
 
-The default validator rejects repeated action signatures on the same controller.
-For generic actions, the target is part of the signature:
-
-- `script_slot:codex`
-- `model_parameter_absolute:temperature`
-
-Disable the rule only when intentionally creating mirrors:
+Disable the rule only when an intentional mirror is required:
 
 ```json
 {
@@ -49,91 +36,118 @@ Disable the rule only when intentionally creating mirrors:
 }
 ```
 
-## Shift layers
+## Layers
+
+Mappings can require or exclude held buttons:
+
+```json
+{"requires": ["f1.shift"]}
+```
+
+```json
+{"unless": ["f1.shift"]}
+```
+
+The default uses `f1.shift` for model knobs and scripts, `x1.shift` for custom
+upper-button scripts, and `x1.hotcue` for transport diagnostics.
+
+## Hardware-light brightness
+
+The built-in action `hardware_light_absolute` scales all F1 RGB/button output
+and X1 LED output from zero to full.
 
 ```json
 {
-  "requires": ["f1.shift"]
+  "device": "f1",
+  "control": "knob_3",
+  "kind": "absolute",
+  "action": "hardware_light_absolute",
+  "unless": ["f1.shift"]
 }
 ```
 
-Use `unless` on the normal mapping so only one layer executes:
+```json
+{
+  "visuals": {
+    "light_brightness_default": 0.75,
+    "light_brightness_state_file":
+      "~/.config/traktor-system-controller/light-brightness.json"
+  }
+}
+```
+
+## Focused-window geometry
+
+Built-in continuous actions:
+
+```text
+window_x_absolute
+window_y_absolute
+window_width_absolute
+window_height_absolute
+window_opacity_absolute
+window_border_absolute
+window_output_absolute
+window_focus_horizontal_relative
+window_focus_vertical_relative
+window_move_horizontal_relative
+window_move_vertical_relative
+```
+
+Example:
 
 ```json
 {
-  "unless": ["f1.shift"]
+  "device": "x1",
+  "control": "fx1_knob_2",
+  "kind": "absolute",
+  "action": "window_width_absolute",
+  "minimum": 320
+}
+```
+
+Position and size controls enable floating mode. X/Y spans the bounding
+rectangle of all active outputs. `window_output_absolute` sorts active outputs
+by global X/Y position and selects one from the knob position.
+
+## Close the focused window
+
+The only default close binding is F1 `REVERSE`:
+
+```json
+{
+  "actions": {
+    "close_focused_window": ["swaymsg", "kill"]
+  }
 }
 ```
 
 ## Script slots
 
-A slot is a named command target. It can be enabled, disabled or confirmation
-gated independently of the physical mapping.
-
 ```json
 {
   "script_slots": {
-    "autocode": {
-      "label": "Autocode",
+    "custom_01": {
+      "label": "Local agent",
       "enabled": true,
-      "confirm": "Start the autonomous coding workspace?",
+      "confirm": "Start the local agent?",
       "command": [
         "foot",
-        "--working-directory={home}/Projects/autocode"
+        "--working-directory=/home/otp/Projects/flux2",
+        "fish",
+        "-lc",
+        "autocode; exec fish"
       ]
     }
   }
 }
 ```
 
-A slot mapping:
-
-```json
-{
-  "device": "f1",
-  "control": "grid_1",
-  "kind": "press",
-  "action": "script_slot",
-  "slot": "autocode",
-  "requires": ["f1.shift"]
-}
-```
-
 ## Model parameters
 
-Parameter definitions control range, quantization and defaults:
-
-```json
-{
-  "model_controls": {
-    "parameters": {
-      "temperature": {
-        "min": 0.0,
-        "max": 2.0,
-        "step": 0.01,
-        "default": 0.7,
-        "decimals": 2
-      }
-    }
-  }
-}
-```
-
-Mapping:
-
-```json
-{
-  "device": "x1",
-  "control": "fx1_dry_wet",
-  "kind": "absolute",
-  "action": "model_parameter_absolute",
-  "parameter": "temperature"
-}
-```
-
-The controller does not assume a specific inference API. It writes a stable JSON
-state and invokes a hook, allowing one layout to configure Ollama, llama.cpp,
-OpenAI-compatible clients, Aider, Codex wrappers or Odysseus.
+The default exposes four parameters on `SHIFT + F1 knobs` and four on F1
+faders. Definitions control range, quantization and defaults. State is written
+to `model-controls.json`, then the optional hook runs after the debounce period.
 
 ## Connection policy
 
@@ -147,13 +161,9 @@ OpenAI-compatible clients, Aider, Codex wrappers or Odysseus.
 }
 ```
 
-Policies:
+Policies: `prompt`, `always`, `never`.
 
-- `prompt`: show a Wofi or Zenity decision dialog on first connection;
-- `always`: activate supported controllers immediately;
-- `never`: detect but never claim controllers.
-
-## Hardware mode
+## X1 hardware mode
 
 ```json
 {
@@ -164,31 +174,10 @@ Policies:
 }
 ```
 
-`raw_usb` provides X1 LEDs. `evdev` leaves the kernel driver attached and provides
-input only.
+`raw_usb` provides X1 LED output. `evdev` retains kernel-only input without LED
+control.
 
-## Visuals
-
-```json
-{
-  "visuals": {
-    "theme": "category",
-    "x1": {
-      "dim": 5,
-      "active": 28,
-      "pressed": 127
-    }
-  }
-}
-```
-
-The command-line theme state overrides `visuals.theme`:
-
-```fish
-traktor-system-controller --set-theme sunset
-```
-
-## Validation
+## Validate
 
 ```fish
 traktor-system-controller --validate-config
