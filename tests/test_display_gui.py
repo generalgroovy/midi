@@ -1,24 +1,38 @@
+from __future__ import annotations
+
+import os
+import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from traktor_controller.common import ControlEvent, load_config
 from traktor_controller.unified_actions import ActionDispatcher
 
 
-def test_display_defaults_and_brightness_dry_run():
-    config = load_config(Path("config.default.json"))
-    settings = config["display_controls"]
-    assert settings["brightness"]["backend"] == "auto"
-    assert settings["color_temperature"]["maximum_kelvin"] == 6500
-    dispatcher = ActionDispatcher(config, dry_run=True)
-    assert dispatcher.set_brightness_percent(50)
-    dispatcher.dispatch(
-        {"action": "brightness_absolute"},
-        ControlEvent("f1", "knob_4", "absolute", 50, 0, 100),
-    )
+class DisplayGuiTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.config = load_config(Path("config.default.json"))
+
+    def test_display_defaults_and_brightness_dry_run(self) -> None:
+        settings = self.config["display_controls"]
+        self.assertEqual("auto", settings["brightness"]["backend"])
+        self.assertEqual(6500, settings["color_temperature"]["maximum_kelvin"])
+        dispatcher = ActionDispatcher(self.config, dry_run=True)
+        self.assertTrue(dispatcher.set_brightness_percent(50))
+        dispatcher.dispatch(
+            {"action": "brightness_absolute"},
+            ControlEvent("f1", "knob_4", "absolute", 50, 0, 100),
+        )
+
+    def test_color_temperature_dry_run_is_non_mutating(self) -> None:
+        dispatcher = ActionDispatcher(self.config, dry_run=True)
+        with patch.dict(os.environ, {"WAYLAND_DISPLAY": "wayland-test"}, clear=False), \
+             patch("subprocess.Popen") as popen, \
+             patch("subprocess.run") as run:
+            self.assertTrue(dispatcher.set_color_temperature_kelvin(4500))
+            popen.assert_not_called()
+            run.assert_not_called()
 
 
-def test_color_temperature_dry_run(monkeypatch):
-    config = load_config(Path("config.default.json"))
-    monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-test")
-    dispatcher = ActionDispatcher(config, dry_run=True)
-    assert dispatcher.set_color_temperature_kelvin(4500)
+if __name__ == "__main__":
+    unittest.main()
