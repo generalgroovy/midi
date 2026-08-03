@@ -1,82 +1,61 @@
-# Visual mapping
+# Visual mapping and hardware feedback
 
-The diagrams are generated from the same semantic control names used by the
-configuration fragments. They distinguish applications, workspaces, audio,
-model parameters, monitoring, maintenance, scripts, media and system actions.
+## F1 desktop surface
 
-## F1 desktop + script surface
+![F1 desktop map](../assets/f1-linux-ops.svg)
 
-![F1 Linux operations map](../assets/f1-linux-ops.svg)
+The F1 is optimized for high-frequency desktop actions. Its fourth knob is the
+global hardware-light dimmer. Pad 16 closes the currently focused Sway
+container with `swaymsg kill`. Hold `SHIFT` to replace the normal pad layer with
+the sixteen script slots shown in the diagram.
 
-The normal layer is a complete Sway desktop surface. Hold the physical `SHIFT`
-button while pressing any pad to select the script-slot label printed beneath
-the pad's normal action.
+## X1 window console
 
-Configuration sources:
+![X1 window map](../assets/x1-linux-ops.svg)
+
+The X1 is optimized for spatial window control:
+
+- Browse encoders move the focused container on X and Y.
+- Loop encoders resize width and height.
+- The right FX knobs set absolute X, Y, width and height.
+- Output buttons move or focus across physical screens.
+- Transport controls navigate focus, select layouts and use the scratchpad.
+
+Absolute X/Y controls work best after enabling floating mode. Relative encoders
+also work on tiled containers, where Sway reorders or resizes the layout tree.
+
+## Live controller-light brightness
+
+F1 Knob 4 writes a persistent brightness percentage. F1 and X1 visual workers
+poll it and rescale:
+
+- all sixteen F1 RGB pads;
+- F1 utility and play LEDs;
+- X1 mapped, idle and pressed LED levels.
+
+The state file is:
 
 ```text
-defaults/f1.json
-defaults/scripts.json
-defaults/model.json
+~/.config/traktor-system-controller/controller-brightness
 ```
 
-## X1 system operations + model console
+Set a default or alternate path in `defaults/visuals.json`.
 
-![X1 Linux operations map](../assets/x1-linux-ops.svg)
-
-The upper bank is split between local-model configuration and system status.
-Hold `SHIFT` with the eight upper FX buttons to access `custom_05` through
-`custom_12`.
-
-Configuration sources:
-
-```text
-defaults/x1.json
-defaults/scripts.json
-defaults/model.json
-```
-
-## Visual themes
-
-![Visual theme choices](../assets/visual-themes.svg)
+## Themes
 
 | Theme | Behavior |
 |---|---|
-| `category` | Action-category palette; best orientation aid |
-| `neon` | Maximum saturated color separation |
-| `matrix` | Green terminal aesthetic |
-| `sunset` | Purple, red and orange palette |
-| `mono` | Low-distraction neutral palette |
-| `blackout` | LEDs remain dark until a control is pressed |
-
-Apply a theme:
+| `category` | action-category colors |
+| `neon` | high-saturation colors |
+| `matrix` | green terminal palette |
+| `sunset` | purple-red-orange palette |
+| `mono` | low-distraction neutral palette |
+| `blackout` | dark until pressed |
 
 ```fish
-traktor-system-controller --set-theme matrix
+traktor-system-controller --set-theme category
 systemctl --user restart traktor-system-controller.service
 ```
 
-## Hardware feedback
-
-F1 output report `0x80` drives:
-
-- RGB values for all sixteen pads;
-- brightness for `SYNC`, `QUANT`, `CAPTURE`, `SHIFT`, `REVERSE`, `TYPE`, `SIZE`
-  and `BROWSE`;
-- both LEDs beneath each of the four play buttons.
-
-The X1 raw backend writes its 32-byte LED state through USB endpoint `0x01` and
-reads the device's unlock response. Mapped buttons have an idle level and flash
-at full brightness while physically held.
-
-Set:
-
-```json
-{
-  "hardware": {
-    "x1_backend": "evdev"
-  }
-}
-```
-
-to disable raw USB control and use kernel evdev input without X1 LED output.
+Theme colors and the global dimmer multiply together. `blackout` remains dark
+at idle regardless of the stored brightness.
