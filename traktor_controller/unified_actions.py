@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from .actions import ActionDispatcher as BaseActionDispatcher
@@ -8,6 +9,10 @@ from .common import ControlEvent, log
 
 class ActionDispatcher(BaseActionDispatcher):
     """Merged desktop, model, hardware-light and Sway window actions."""
+
+    def __init__(self, config: dict[str, Any], dry_run: bool = False):
+        super().__init__(config, dry_run=dry_run)
+        self.color_temperature_timer: threading.Timer | None = None
 
     @classmethod
     def _active_outputs(cls) -> list[dict[str, Any]]:
@@ -46,11 +51,47 @@ class ActionDispatcher(BaseActionDispatcher):
             "window_output_absolute",
         )
 
+    def _set_color_temperature(
+        self, mapping: dict[str, Any], event: ControlEvent
+    ) -> None:
+        ratio = self.normalized_value(event, bool(mapping.get("invert", False)))
+        minimum = max(1000, int(mapping.get("minimum_kelvin", 2500)))
+        maximum = min(25000, int(mapping.get("maximum_kelvin", 6500)))
+        if maximum <= minimum:
+            maximum = minimum + 100
+        kelvin = round(minimum + ratio * (maximum - minimum))
+        method = str(mapping.get("adjustment_method", "wayland"))
+        delay = max(0.05, float(mapping.get("debounce_ms", 180)) / 1000.0)
+        command = ["gammastep", "-P", "-m", method, "-O", str(kelvin)]
+
+        if self.log_actions or self.dry_run:
+            log(
+                f"action=color_temperature_absolute kelvin={kelvin} "
+                f"method={method} debounce_ms={round(delay * 1000)}"
+            )
+        if self.dry_run:
+            self._run(command, "color_temperature_absolute")
+            return
+
+        if self.color_temperature_timer:
+            self.color_temperature_timer.cancel()
+
+        def apply() -> None:
+            self._run(command, "color_temperature_absolute")
+            self.color_temperature_timer = None
+
+        timer = threading.Timer(delay, apply)
+        timer.daemon = True
+        self.color_temperature_timer = timer
+        timer.start()
+
     def dispatch(self, mapping: dict[str, Any], event: ControlEvent) -> None:
         action = str(mapping["action"])
         ratio = self.normalized_value(event, bool(mapping.get("invert", False)))
 
-        if action == "window_opacity_absolute":
+        if action == "color_temperature_absolute":
+            self._set_color_temperature(mapping, event)
+        elif action == "window_opacity_absolute":
             minimum = min(max(float(mapping.get("minimum", 0.2)), 0.0), 1.0)
             value = minimum + ratio * (1.0 - minimum)
             self._run(["swaymsg", "opacity", "set", f"{value:.2f}"], action)
