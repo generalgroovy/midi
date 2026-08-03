@@ -5,6 +5,8 @@ HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="$HOME/.config/traktor-system-controller"
 LIB_DIR="$HOME/.local/lib/traktor-system-controller"
 RESET_CONFIG=false
+PACMAN_LOCK="/var/lib/pacman/db.lck"
+PACMAN_WAIT_SECONDS="${PACMAN_WAIT_SECONDS:-180}"
 
 if [[ "${1:-}" == "--reset-config" ]]; then
   RESET_CONFIG=true
@@ -12,6 +14,68 @@ elif [[ $# -gt 0 ]]; then
   printf 'Usage: %s [--reset-config]\n' "$0" >&2
   exit 2
 fi
+
+active_package_managers() {
+  local found=1
+  local name
+  for name in pacman pamac-daemon pamac-tray garuda-update paru yay; do
+    if pgrep -a -x "$name" 2>/dev/null; then
+      found=0
+    fi
+  done
+  return "$found"
+}
+
+prepare_pacman_lock() {
+  local waited=0
+  local processes=""
+
+  while sudo test -e "$PACMAN_LOCK"; do
+    processes="$(active_package_managers || true)"
+
+    if [[ -n "$processes" ]]; then
+      if (( waited == 0 )); then
+        printf 'Pacman database is in use. Waiting up to %s seconds.\n' \
+          "$PACMAN_WAIT_SECONDS" >&2
+        printf '%s\n' "$processes" >&2
+      fi
+
+      if (( waited >= PACMAN_WAIT_SECONDS )); then
+        printf '\nPackage management is still active. Do not remove %s yet.\n' \
+          "$PACMAN_LOCK" >&2
+        printf 'Wait for the process to finish, then rerun this installer.\n' >&2
+        exit 1
+      fi
+
+      sleep 3
+      ((waited += 3))
+      continue
+    fi
+
+    printf '\nFound %s, but no package-manager process is running.\n' \
+      "$PACMAN_LOCK" >&2
+    printf 'This normally means the lock is stale after an interrupted update.\n' >&2
+
+    if [[ ! -t 0 ]]; then
+      printf 'Run interactively, verify no package manager is active, then remove the stale lock.\n' >&2
+      exit 1
+    fi
+
+    read -r -p 'Remove the stale Pacman lock and continue? [y/N] ' answer
+    case "$answer" in
+      y|Y|yes|YES|Yes)
+        sudo rm -f -- "$PACMAN_LOCK"
+        printf 'Removed stale Pacman lock.\n'
+        ;;
+      *)
+        printf 'Installer stopped without changing the lock.\n' >&2
+        exit 1
+        ;;
+    esac
+  done
+}
+
+prepare_pacman_lock
 
 sudo pacman -S --needed \
   python python-evdev python-hidapi python-pyusb playerctl libnotify wireplumber \
