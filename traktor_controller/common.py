@@ -11,8 +11,15 @@ BUILTIN_ACTIONS = {
     "volume_absolute", "volume_relative",
     "source_volume_absolute", "source_volume_relative",
     "brightness_absolute", "brightness_relative",
+    "controller_brightness_absolute",
     "bass_preset_absolute", "media_seek_relative", "workspace_relative",
-    "sway_gap_absolute", "model_parameter_absolute", "model_parameter_relative",
+    "sway_gap_absolute",
+    "pointer_accel_absolute", "scroll_factor_absolute", "color_temperature_absolute",
+    "window_move_horizontal_relative", "window_move_vertical_relative",
+    "window_resize_width_relative", "window_resize_height_relative",
+    "window_x_absolute", "window_y_absolute",
+    "window_width_absolute", "window_height_absolute",
+    "model_parameter_absolute", "model_parameter_relative",
     "script_slot",
 }
 
@@ -56,6 +63,14 @@ def atomic_write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def atomic_write_text(path: Path, value: str) -> None:
+    path = path.expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(value, encoding="utf-8")
     temporary.replace(path)
 
 
