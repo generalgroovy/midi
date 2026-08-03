@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "include": [
     "defaults/actions.json",
     "defaults/model.json",
@@ -11,7 +11,7 @@
   "active_profile": "linux-ops",
   "profiles": {
     "linux-ops": {
-      "description": "Unified F1 desktop/model/script surface and X1 focused-window cockpit with HOTCUE diagnostics; no repeated action signatures per controller."
+      "description": "Unified F1 desktop/model/script surface and X1 focused-window cockpit with GUI configuration and monitoring."
     },
     "blank": {
       "description": "No mappings."
@@ -24,5 +24,23 @@
     "log_actions": true,
     "notify_actions": false
   },
-  "_customization": "Override actions, script_slots, model_controls, visuals, connection policy or mappings here. Included lists concatenate; objects recursively merge."
+  "display_controls": {
+    "brightness": {
+      "backend": "auto",
+      "device": "",
+      "ddc_display": "",
+      "minimum_percent": 1,
+      "debounce_ms": 100
+    },
+    "color_temperature": {
+      "backend": "auto",
+      "minimum_kelvin": 2500,
+      "maximum_kelvin": 6500,
+      "adjustment_method": "wayland",
+      "debounce_ms": 180,
+      "take_ownership": true,
+      "reset_at_max": true
+    }
+  },
+  "_customization": "Override display_controls, actions, script_slots, model_controls, visuals, connection policy or mappings here. Included lists concatenate; objects recursively merge."
 }
