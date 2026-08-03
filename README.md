@@ -2,44 +2,98 @@
 
 Linux/Sway sibling of [MIDIWIN](https://github.com/generalgroovy/midiwin).
 
-Use a Native Instruments Traktor Kontrol F1 and X1 MK1 as complementary Garuda
-Sway control surfaces.
-
-- **F1:** desktop, media, audio, Linux settings, local-model parameters and
-  sixteen Shift script slots.
-- **X1:** focused-window presets, position, size, opacity, borders, output
-  selection, layouts, scratchpad, diagnostics and eight Shift script slots.
-
-The validator rejects repeated enabled action signatures on the same controller.
+Use Native Instruments Traktor Kontrol F1 and X1 MK1 as complementary Garuda
+Sway control surfaces for desktop, media, audio, display controls, scripts,
+model parameters and focused-window management.
 
 ![Unified physical controller overview](assets/layout-overview.svg)
 
-## Unified default highlights
+## Controller console
 
-- **F1 Knob 3:** dim all F1 and X1 hardware lights from 0–100%.
-- **F1 Knob 4:** display backlight brightness.
-- **F1 Fader 3:** display color temperature from 2500–6500 K.
-- **F1 Reverse:** close the currently focused Sway window with `swaymsg kill`.
-- **F1 Shift + knobs/faders:** eight local-model parameters.
-- **X1 FX1 knobs:** focused-window X, Y, width and height.
-- **X1 FX2 knobs:** opacity, border width, Sway gaps and output selection.
-- **X1 Browse encoders:** move the focused window horizontally and vertically.
-- **X1 Loop encoders:** resize width and height.
-- **X1 upper buttons:** center, half-screen, maximum, top, bottom, PiP and reset
-  window presets.
-- **X1 HOTCUE layer:** monitoring and maintenance commands.
+The GUI provides:
 
-The close-window action has exactly one default binding.
+- a representative front-panel layout for the F1 and X1;
+- live control highlighting during read-only monitoring;
+- brightness and blue-light backend configuration;
+- live brightness and color-temperature testing;
+- mapping and modifier-layer overview;
+- device detection, configuration validation and backend diagnostics;
+- safe service stop/start/restart and journal inspection.
 
-## Install, reconcile local branches and run
+After installation, open **MIDILIN Controller Console** from the application
+launcher or run:
 
 ```fish
-curl -L https://raw.githubusercontent.com/generalgroovy/midilin/main/setup-and-run.fish \
-  -o /tmp/setup-midilin.fish
-fish /tmp/setup-midilin.fish
+midilin-gui
 ```
 
-Unplug and reconnect both controllers after installation when udev rules change.
+## Install or update
+
+```fish
+cd ~/Projects/midilin
+git pull --ff-only
+sudo -v
+bash ./install.sh --reset-config
+```
+
+The reset preserves the existing configuration with a timestamped backup and
+installs schema 5 display settings. Then import the Sway environment and restart:
+
+```fish
+systemctl --user import-environment \
+    WAYLAND_DISPLAY \
+    SWAYSOCK \
+    XDG_CURRENT_DESKTOP \
+    XDG_RUNTIME_DIR
+
+systemctl --user restart traktor-system-controller.service
+```
+
+## Repaired brightness behavior
+
+F1 Knob 4 maps to `brightness_absolute`.
+
+- `backend=backlight` uses `brightnessctl --class=backlight` for laptop panels.
+- `backend=ddc` uses `ddcutil setvcp 10` for DDC/CI monitors.
+- `backend=auto` attempts both and reports exact failures rather than suppressing
+  stderr.
+- A specific brightnessctl device or ddcutil display number can be selected in
+  the GUI.
+
+```fish
+traktor-system-controller --diagnose-display
+traktor-system-controller --set-brightness 50
+```
+
+## Repaired blue-light behavior
+
+F1 Fader 3 maps to `color_temperature_absolute`.
+
+- `backend=auto` tries Wlsunset first and Gammastep second.
+- Wlsunset is started as a persistent wlroots gamma-control process.
+- Gammastep uses the explicit Wayland adjustment method and clears stale gamma
+  ramps before applying a temperature.
+- Existing user-owned Wlsunset/Gammastep processes are stopped before a new value
+  is applied.
+- The maximum endpoint resets to neutral 6500 K.
+- Missing `WAYLAND_DISPLAY`, compositor gamma support and command failures are
+  shown in the service journal and GUI diagnostics.
+
+```fish
+traktor-system-controller --set-temperature 4500
+journalctl --user -u traktor-system-controller.service -n 150 --no-pager
+```
+
+## Default highlights
+
+- F1 Knob 3: controller-light brightness
+- F1 Knob 4: screen brightness
+- F1 Fader 3: blue-light/color temperature
+- F1 Reverse: close focused Sway window
+- F1 Shift knobs/faders: model parameters
+- X1 FX knobs: position, size, opacity, borders, gaps and output
+- X1 Browse/Loop encoders: move and resize focused windows
+- X1 HOTCUE layer: monitoring and maintenance
 
 ## Verify
 
@@ -47,41 +101,28 @@ Unplug and reconnect both controllers after installation when udev rules change.
 traktor-system-controller --validate-config
 traktor-system-controller --show-layout
 traktor-system-controller --list-devices
+traktor-system-controller --diagnose-display
 ```
 
-Test real controls without executing actions:
+Read-only controller monitoring is available directly in the GUI. From the
+terminal:
 
 ```fish
 systemctl --user stop traktor-system-controller.service
-traktor-system-controller --dry-run
+traktor-system-controller --monitor --dry-run
 ```
 
-Start normally:
-
-```fish
-systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP
-systemctl --user restart traktor-system-controller.service
-journalctl --user -u traktor-system-controller.service -f
-```
+Stop with `Ctrl+C`, then restart the service.
 
 ## Configuration
 
 ```text
 ~/.config/traktor-system-controller/config.json
-~/.config/traktor-system-controller/defaults/actions.json
-~/.config/traktor-system-controller/defaults/model.json
-~/.config/traktor-system-controller/defaults/scripts.json
-~/.config/traktor-system-controller/defaults/visuals.json
-~/.config/traktor-system-controller/defaults/f1.json
-~/.config/traktor-system-controller/defaults/x1.json
 ```
 
-## Documentation
-
-- [`docs/LAYOUT.md`](docs/LAYOUT.md)
-- [`docs/VISUAL_MAPPING.md`](docs/VISUAL_MAPPING.md)
-- [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
-- [`docs/SYSTEM_ACTIONS.md`](docs/SYSTEM_ACTIONS.md)
+The `display_controls` section selects brightness and color-temperature
+backends. Mapping definitions remain in `defaults/f1.json` and
+`defaults/x1.json`.
 
 ## Related project
 
