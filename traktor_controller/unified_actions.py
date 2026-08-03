@@ -166,7 +166,7 @@ class ActionDispatcher(BaseActionDispatcher):
             if not ok:
                 errors.append(error)
 
-        if backend in {"auto", "ddc", "ddcutil"} and shutil.which("ddcutil"):
+        if backend in {"auto", "ddc", "ddcutil"} and (self.dry_run or shutil.which("ddcutil")):
             command = ["ddcutil"]
             if ddc_display:
                 command.extend(["--display", ddc_display])
@@ -200,6 +200,8 @@ class ActionDispatcher(BaseActionDispatcher):
         timer.start()
 
     def _stop_color_tools(self) -> None:
+        if self.dry_run:
+            return
         uid = str(os.getuid())
         for process in ("gammastep", "wlsunset"):
             subprocess.run(["pkill", "-u", uid, "-x", process],
@@ -207,12 +209,14 @@ class ActionDispatcher(BaseActionDispatcher):
                            stderr=subprocess.DEVNULL, check=False)
 
     def _start_wlsunset(self, kelvin: int) -> bool:
-        if not shutil.which("wlsunset"):
-            return False
         command = ["wlsunset", "-T", str(kelvin), "-t", str(kelvin),
                    "-S", "00:00", "-s", "23:59", "-d", "0"]
-        if self.log_actions:
+        if self.log_actions or self.dry_run:
             log(f"action=color_temperature_absolute command={' '.join(command)}")
+        if self.dry_run:
+            return True
+        if not shutil.which("wlsunset"):
+            return False
         try:
             process = subprocess.Popen(command, stdin=subprocess.DEVNULL,
                                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
@@ -244,7 +248,7 @@ class ActionDispatcher(BaseActionDispatcher):
         if takeover:
             self._stop_color_tools()
         if reset_at_max and ratio >= 0.995:
-            if shutil.which("gammastep"):
+            if self.dry_run or shutil.which("gammastep"):
                 self._run_checked(["gammastep", "-m", method, "-x"],
                                   "color_temperature_reset")
             return True
@@ -282,9 +286,7 @@ class ActionDispatcher(BaseActionDispatcher):
         if self.color_temperature_timer:
             self.color_temperature_timer.cancel()
         if self.dry_run:
-            method = str(mapping.get("adjustment_method", "wayland"))
-            self._run_checked(["gammastep", "-P", "-m", method, "-O", str(kelvin)],
-                              "color_temperature_absolute")
+            self._apply_color_temperature(mapping, ratio, kelvin)
             return
         def apply() -> None:
             self._apply_color_temperature(mapping, ratio, kelvin)
