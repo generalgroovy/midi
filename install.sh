@@ -79,7 +79,7 @@ prepare_pacman_lock
 
 sudo pacman -S --needed \
   python python-evdev python-hidapi python-pyusb playerctl libnotify wireplumber \
-  brightnessctl gammastep easyeffects usbutils hid-tools evtest xdg-utils jq \
+  brightnessctl gammastep wlsunset easyeffects usbutils hid-tools evtest xdg-utils jq \
   foot wofi zenity grim slurp pavucontrol swaylock qpwgraph \
   btop ncdu bmon fastfetch lm_sensors cliphist wl-clipboard wf-recorder \
   wdisplays blueman pacman-contrib
@@ -135,7 +135,7 @@ Installed.
      traktor-system-controller --validate-config
      traktor-system-controller --show-layout
 3. Import Sway environment and start:
-     systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP
+     systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP XDG_RUNTIME_DIR
      systemctl --user restart traktor-system-controller.service
 4. A graphical consent prompt appears when each controller connects.
 
