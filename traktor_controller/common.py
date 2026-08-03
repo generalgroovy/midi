@@ -19,6 +19,7 @@ BUILTIN_ACTIONS = {
     "window_resize_width_relative", "window_resize_height_relative",
     "window_x_absolute", "window_y_absolute",
     "window_width_absolute", "window_height_absolute",
+    "window_opacity_absolute", "window_border_absolute", "window_output_absolute",
     "model_parameter_absolute", "model_parameter_relative",
     "script_slot",
 }
