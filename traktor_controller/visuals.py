@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any
 
 THEME_KEYS = (
     "application", "workspace", "audio", "system", "monitor",
-    "maintenance", "model", "script", "media", "unmapped",
+    "maintenance", "model", "script", "media", "window", "unmapped",
 )
 THEMES = {
     "category": {
@@ -13,21 +14,24 @@ THEMES = {
         "audio": (100, 42, 8), "system": (100, 12, 22),
         "monitor": (8, 90, 50), "maintenance": (100, 75, 5),
         "model": (95, 15, 90), "script": (8, 80, 100),
-        "media": (10, 100, 30), "unmapped": (4, 4, 8),
+        "media": (10, 100, 30), "window": (15, 95, 115),
+        "unmapped": (4, 4, 8),
     },
     "neon": {
         "application": (0, 105, 127), "workspace": (90, 0, 127),
         "audio": (127, 40, 0), "system": (127, 0, 35),
         "monitor": (0, 127, 45), "maintenance": (127, 95, 0),
         "model": (127, 0, 115), "script": (0, 95, 127),
-        "media": (0, 127, 20), "unmapped": (3, 3, 7),
+        "media": (0, 127, 20), "window": (0, 127, 127),
+        "unmapped": (3, 3, 7),
     },
     "sunset": {
         "application": (90, 20, 70), "workspace": (75, 8, 105),
         "audio": (127, 35, 0), "system": (115, 5, 25),
         "monitor": (70, 35, 95), "maintenance": (127, 75, 0),
         "model": (110, 0, 85), "script": (100, 15, 65),
-        "media": (127, 50, 5), "unmapped": (5, 2, 5),
+        "media": (127, 50, 5), "window": (100, 25, 110),
+        "unmapped": (5, 2, 5),
     },
 }
 THEMES["matrix"] = {
@@ -96,10 +100,33 @@ def set_theme(config: dict[str, Any], theme: str) -> None:
     path.write_text(theme + "\n", encoding="utf-8")
 
 
+def brightness_state_path(config: dict[str, Any]) -> Path:
+    visuals = config.get("visuals", {})
+    if not isinstance(visuals, dict):
+        visuals = {}
+    return Path(str(visuals.get(
+        "brightness_state_file",
+        "~/.config/traktor-system-controller/controller-brightness",
+    ))).expanduser()
+
+
+def read_brightness_percent(config: dict[str, Any]) -> int:
+    visuals = config.get("visuals", {})
+    default = int(visuals.get("brightness", 100)) if isinstance(visuals, dict) else 100
+    try:
+        value = int(brightness_state_path(config).read_text(encoding="utf-8").strip())
+    except (FileNotFoundError, ValueError):
+        value = default
+    return min(max(value, 0), 100)
+
+
 def _requires_shift(mapping: dict[str, Any], device: str) -> bool:
     value = mapping.get("requires", [])
     values = [value] if isinstance(value, str) else value
-    return any(str(item) in {"shift", f"{device}.shift", f"{device}:shift"} for item in values)
+    return any(
+        str(item) in {"shift", f"{device}.shift", f"{device}:shift"}
+        for item in values
+    )
 
 
 def mapping_category(
@@ -131,17 +158,44 @@ def mapping_category(
         return "script"
     if action.startswith("model_parameter_"):
         return "model"
+    if action.startswith("window_"):
+        return "window"
     return str(categories.get(action, candidates[0].get("category", "system")))
 
 
-class F1Visual:
+class _BrightnessWatcher:
+    def _start_brightness_watcher(self) -> None:
+        self._brightness_stop = threading.Event()
+        self._brightness_percent = read_brightness_percent(self.config)
+        self._brightness_thread = threading.Thread(
+            target=self._brightness_loop, daemon=True
+        )
+        self._brightness_thread.start()
+
+    def _brightness_loop(self) -> None:
+        while not self._brightness_stop.wait(0.12):
+            value = read_brightness_percent(self.config)
+            if value != self._brightness_percent:
+                self._brightness_percent = value
+                self._render()
+
+    def _scale(self, value: int) -> int:
+        return min(127, max(0, round(value * self._brightness_percent / 100)))
+
+    def _stop_brightness_watcher(self) -> None:
+        self._brightness_stop.set()
+
+
+class F1Visual(_BrightnessWatcher):
     def __init__(self, device: Any, config: dict[str, Any], theme: str):
         self.device = device
         self.config = config
         self.theme = theme
         self.pressed: set[str] = set()
+        self.write_lock = threading.Lock()
         self.base = bytearray(81)
         self.base[0] = 0x80
+        self._start_brightness_watcher()
         self._render()
 
     def color(self, category: str) -> tuple[int, int, int]:
@@ -155,7 +209,8 @@ class F1Visual:
 
     def write(self, packet: bytearray) -> None:
         try:
-            self.device.write(bytes(packet))
+            with self.write_lock:
+                self.device.write(bytes(packet))
         except Exception as exc:
             log(f"F1 LED write failed: {exc}")
 
@@ -168,15 +223,16 @@ class F1Visual:
             color = self.color(mapping_category(self.config, "f1", control, shifted))
             if control in self.pressed:
                 color = (127, 127, 127)
+            color = tuple(self._scale(channel) for channel in color)
             self._grid(packet, number, color)
         for control, index in F1_BUTTON_LED_INDEX.items():
             active = mapping_category(self.config, "f1", control) != "unmapped"
             idle = 0 if self.theme == "blackout" else (28 if active else 3)
-            packet[index] = 127 if control in self.pressed else idle
+            packet[index] = self._scale(127 if control in self.pressed else idle)
         for control, indexes in F1_PLAY_LED_INDEX.items():
             active = mapping_category(self.config, "f1", control) != "unmapped"
             idle = 0 if self.theme == "blackout" else (42 if active else 3)
-            value = 127 if control in self.pressed else idle
+            value = self._scale(127 if control in self.pressed else idle)
             for index in indexes:
                 packet[index] = value
         self.base = packet
@@ -190,45 +246,51 @@ class F1Visual:
         self._render()
 
     def clear(self) -> None:
+        self._stop_brightness_watcher()
         packet = bytearray(81)
         packet[0] = 0x80
         self.write(packet)
 
 
-class X1Visual:
+class X1Visual(_BrightnessWatcher):
     def __init__(self, device: Any, config: dict[str, Any], theme: str):
         self.device = device
         self.config = config
         self.theme = theme
         self.pressed_controls: set[str] = set()
+        self.write_lock = threading.Lock()
         options = config.get("visuals", {}).get("x1", {})
         self.dim = 0 if theme == "blackout" else int(options.get("dim", 5))
         self.active = 0 if theme == "blackout" else int(options.get("active", 28))
         self.pressed = int(options.get("pressed", 127))
         self.base = bytearray(32)
+        self._start_brightness_watcher()
         self._render()
 
     def write(self, packet: bytearray) -> None:
         try:
-            self.device.write(0x01, packet, timeout=100)
-            try:
-                self.device.read(0x81, 1, timeout=30)
-            except Exception:
-                pass
+            with self.write_lock:
+                self.device.write(0x01, packet, timeout=100)
+                try:
+                    self.device.read(0x81, 1, timeout=30)
+                except Exception:
+                    pass
         except Exception as exc:
             log(f"X1 LED write failed: {exc}")
 
     def _render(self) -> None:
-        packet = bytearray([self.dim] * 32)
+        packet = bytearray([self._scale(self.dim)] * 32)
         packet[0] = 12
         packet[31] = 0
         shifted = "shift" in self.pressed_controls
         for control, index in X1_LED_INDEX.items():
-            active = mapping_category(self.config, "x1", control, shifted) != "unmapped"
+            active = mapping_category(
+                self.config, "x1", control, shifted
+            ) != "unmapped"
             if active:
-                packet[index] = self.active
+                packet[index] = self._scale(self.active)
             if control in self.pressed_controls:
-                packet[index] = self.pressed
+                packet[index] = self._scale(self.pressed)
         self.base = packet
         self.write(packet)
 
@@ -242,6 +304,7 @@ class X1Visual:
         self._render()
 
     def clear(self) -> None:
+        self._stop_brightness_watcher()
         packet = bytearray(32)
         packet[0] = 12
         self.write(packet)
