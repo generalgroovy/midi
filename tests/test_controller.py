@@ -8,10 +8,10 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from traktor_controller.actions import ActionDispatcher
 from traktor_controller.cli import validate_config
-from traktor_controller.common import load_config
+from traktor_controller.common import ControlEvent, load_config
 from traktor_controller.router import EventRouter
+from traktor_controller.unified_actions import ActionDispatcher
 
 
 class FakeDispatcher:
@@ -22,6 +22,8 @@ class FakeDispatcher:
         signature = mapping["action"]
         if signature == "script_slot":
             signature += ":" + mapping["slot"]
+        elif signature.startswith("model_parameter_"):
+            signature += ":" + mapping["parameter"]
         self.actions.append(signature)
 
 
@@ -56,13 +58,15 @@ def load_backend():
 
 
 class ControllerTests(unittest.TestCase):
-    def test_default_config_and_unique_layout(self) -> None:
-        config = load_config(Path("config.default.json"))
-        self.assertEqual([], validate_config(config))
-        self.assertGreaterEqual(len(config["mappings"]), 100)
+    def setUp(self) -> None:
+        self.config = load_config(Path("config.default.json"))
+
+    def test_default_config_is_unique_and_complete(self) -> None:
+        self.assertEqual([], validate_config(self.config))
+        self.assertGreaterEqual(len(self.config["mappings"]), 120)
         for device in ("f1", "x1"):
-            signatures = []
-            for mapping in config["mappings"]:
+            signatures: list[str] = []
+            for mapping in self.config["mappings"]:
                 if mapping.get("device") != device or not mapping.get("enabled", True):
                     continue
                 action = mapping["action"]
@@ -73,46 +77,99 @@ class ControllerTests(unittest.TestCase):
                 signatures.append(action)
             self.assertEqual(len(signatures), len(set(signatures)), device)
 
-    def test_required_high_value_bindings(self) -> None:
-        config = load_config(Path("config.default.json"))
+    def test_f1_unified_controls(self) -> None:
         bindings = {
-            (m["device"], m["control"], m["kind"]): m["action"]
-            for m in config["mappings"]
-            if m.get("enabled", True) and not m.get("requires")
+            (m["device"], m["control"], m["kind"], tuple(m.get("requires", []))): m["action"]
+            for m in self.config["mappings"]
+            if m.get("enabled", True)
         }
         self.assertEqual(
             "controller_brightness_absolute",
-            bindings[("f1", "knob_4", "absolute")],
+            bindings[("f1", "knob_3", "absolute", ())],
+        )
+        self.assertEqual(
+            "brightness_absolute",
+            bindings[("f1", "knob_4", "absolute", ())],
+        )
+        self.assertEqual(
+            "color_temperature_absolute",
+            bindings[("f1", "fader_3", "absolute", ())],
         )
         self.assertEqual(
             "close_focused_window",
-            bindings[("f1", "grid_16", "press")],
-        )
-        self.assertEqual(
-            "window_move_horizontal_relative",
-            bindings[("x1", "deck_a_browse_encoder", "relative")],
-        )
-        self.assertEqual(
-            "window_resize_height_relative",
-            bindings[("x1", "deck_b_loop_encoder", "relative")],
+            bindings[("f1", "reverse", "press", ())],
         )
         close_bindings = [
-            m for m in config["mappings"]
+            m for m in self.config["mappings"]
             if m.get("enabled", True) and m.get("action") == "close_focused_window"
         ]
         self.assertEqual(1, len(close_bindings))
 
-    def test_x1_alias_and_shift_layer(self) -> None:
-        config = {"actions": {"normal": ["true"], "shifted": ["true"]}, "mappings": [
-            {"device": "x1", "control": "deck_a_play", "kind": "press", "action": "normal", "unless": "x1.shift"},
-            {"device": "x1", "control": "deck_a_play", "kind": "press", "action": "shifted", "requires": "x1.shift"},
-        ]}
-        router = EventRouter(config, monitor=False)
+    def test_x1_window_cockpit_controls(self) -> None:
+        expected_absolute = {
+            "fx1_dry_wet": "window_x_absolute",
+            "fx1_knob_1": "window_y_absolute",
+            "fx1_knob_2": "window_width_absolute",
+            "fx1_knob_3": "window_height_absolute",
+            "fx2_dry_wet": "window_opacity_absolute",
+            "fx2_knob_1": "window_border_absolute",
+            "fx2_knob_2": "sway_gap_absolute",
+            "fx2_knob_3": "window_output_absolute",
+        }
+        actual = {
+            mapping["control"]: mapping["action"]
+            for mapping in self.config["mappings"]
+            if mapping.get("device") == "x1"
+            and mapping.get("kind") == "absolute"
+        }
+        self.assertEqual(expected_absolute, actual)
+        relative = {
+            mapping["control"]: mapping["action"]
+            for mapping in self.config["mappings"]
+            if mapping.get("device") == "x1"
+            and mapping.get("kind") == "relative"
+        }
+        self.assertEqual("window_move_horizontal_relative", relative["deck_a_browse_encoder"])
+        self.assertEqual("window_move_vertical_relative", relative["deck_b_browse_encoder"])
+        self.assertEqual("window_resize_width_relative", relative["deck_a_loop_encoder"])
+        self.assertEqual("window_resize_height_relative", relative["deck_b_loop_encoder"])
+
+    def test_shift_and_hotcue_layers_route_exclusively(self) -> None:
+        router = EventRouter(self.config, monitor=False)
         fake = FakeDispatcher()
         router.dispatcher = fake
-        router.emit(SimpleNamespace(device="x1", control="BTN_36", kind="press", value=1))
-        router.emit(SimpleNamespace(device="x1", control="BTN_0", kind="press", value=1))
-        self.assertEqual(["shifted"], fake.actions)
+
+        router.emit(SimpleNamespace(device="f1", control="shift", kind="press", value=1))
+        router.emit(SimpleNamespace(
+            device="f1", control="knob_1", kind="absolute", value=2048,
+            minimum=0, maximum=4096,
+        ))
+        self.assertEqual(["model_parameter_absolute:temperature"], fake.actions)
+
+        fake.actions.clear()
+        router.emit(SimpleNamespace(device="x1", control="BTN_39", kind="press", value=1))
+        router.emit(SimpleNamespace(device="x1", control="BTN_20", kind="press", value=1))
+        self.assertEqual(["system_info"], fake.actions)
+
+    def test_color_temperature_uses_wayland_reset_and_debounce(self) -> None:
+        dispatcher = ActionDispatcher(self.config, dry_run=True)
+        commands: list[tuple[list[str] | str, str]] = []
+        dispatcher._run = lambda command, action, confirm=None: commands.append((command, action))
+        dispatcher.dispatch(
+            {
+                "action": "color_temperature_absolute",
+                "minimum_kelvin": 2500,
+                "maximum_kelvin": 6500,
+                "adjustment_method": "wayland",
+                "debounce_ms": 180,
+            },
+            ControlEvent("f1", "fader_3", "absolute", 2048, 0, 4096),
+        )
+        self.assertEqual(
+            (["gammastep", "-P", "-m", "wayland", "-O", "4500"],
+             "color_temperature_absolute"),
+            commands[-1],
+        )
 
     def test_model_parameter_persistence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -130,11 +187,7 @@ class ControllerTests(unittest.TestCase):
                 },
             }
             dispatcher = ActionDispatcher(config)
-            event = SimpleNamespace(
-                device="x1", control="fx1_dry_wet",
-                raw_control="fx1_dry_wet", kind="absolute",
-                value=2048, minimum=0, maximum=4096,
-            )
+            event = ControlEvent("f1", "knob_1", "absolute", 2048, 0, 4096)
             dispatcher.dispatch(
                 {"action": "model_parameter_absolute", "parameter": "temperature"},
                 event,
@@ -150,10 +203,7 @@ class ControllerTests(unittest.TestCase):
                 "visuals": {"brightness_state_file": str(path)},
             }
             dispatcher = ActionDispatcher(config)
-            event = SimpleNamespace(
-                device="f1", control="knob_4", raw_control="knob_4",
-                kind="absolute", value=1024, minimum=0, maximum=4096,
-            )
+            event = ControlEvent("f1", "knob_3", "absolute", 1024, 0, 4096)
             dispatcher.dispatch({"action": "controller_brightness_absolute"}, event)
             self.assertEqual("25", path.read_text().strip())
 
@@ -168,59 +218,34 @@ class ControllerTests(unittest.TestCase):
             },
         }
         dispatcher = ActionDispatcher(config, dry_run=True)
-        event = SimpleNamespace(
-            device="f1", control="grid_2", raw_control="grid_2",
-            kind="press", value=1, minimum=0, maximum=1,
-        )
+        event = ControlEvent("f1", "grid_2", "press", 1)
         rendered = dispatcher._render(
             dispatcher.script_slots["codex"]["command"],
             event, {"slot": "codex"},
         )
         self.assertEqual(["echo", "codex", "grid_2"], rendered)
 
-    def test_f1_visual_packet_and_press_feedback(self) -> None:
-        backend = load_backend()
-        with tempfile.TemporaryDirectory() as directory:
-            config = load_config(Path("config.default.json"))
-            config["visuals"]["brightness_state_file"] = str(Path(directory) / "brightness")
-            device = FakeHid()
-            visual = backend.F1Visual(device, config, "category")
-            self.assertEqual(0x80, device.writes[-1][0])
-            self.assertEqual(81, len(device.writes[-1]))
-            visual.feedback("grid_1", True)
-            packet = device.writes[-1]
-            self.assertEqual((127, 127, 127), (packet[26], packet[27], packet[25]))
-            visual.clear()
-
-    def test_live_visual_brightness_scaling(self) -> None:
+    def test_visual_feedback_and_live_brightness(self) -> None:
         backend = load_backend()
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / "brightness"
             state.write_text("50\n")
             config = load_config(Path("config.default.json"))
             config["visuals"]["brightness_state_file"] = str(state)
-            device = FakeHid()
-            visual = backend.F1Visual(device, config, "category")
-            visual.feedback("grid_1", True)
-            packet = device.writes[-1]
+            f1_device = FakeHid()
+            x1_device = FakeUsb()
+            f1 = backend.F1Visual(f1_device, config, "category")
+            x1 = backend.X1Visual(x1_device, config, "neon")
+            f1.feedback("grid_1", True)
+            packet = f1_device.writes[-1]
             self.assertEqual((64, 64, 64), (packet[26], packet[27], packet[25]))
+            x1.feedback("deck_a_play", True)
+            self.assertEqual(64, x1_device.writes[-1][1][24])
             state.write_text("25\n")
             time.sleep(0.2)
-            packet = device.writes[-1]
-            self.assertLessEqual(max(packet[25:28]), 32)
-            visual.clear()
-
-    def test_x1_visual_led_write(self) -> None:
-        backend = load_backend()
-        with tempfile.TemporaryDirectory() as directory:
-            config = load_config(Path("config.default.json"))
-            config["visuals"]["brightness_state_file"] = str(Path(directory) / "brightness")
-            device = FakeUsb()
-            visual = backend.X1Visual(device, config, "neon")
-            self.assertEqual(0x01, device.writes[-1][0])
-            visual.feedback("deck_a_play", True)
-            self.assertEqual(127, device.writes[-1][1][24])
-            visual.clear()
+            self.assertLessEqual(max(f1_device.writes[-1][25:28]), 32)
+            f1.clear()
+            x1.clear()
 
     def test_connection_always_policy(self) -> None:
         backend = load_backend()

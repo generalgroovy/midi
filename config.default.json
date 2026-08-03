@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "include": [
     "defaults/actions.json",
     "defaults/model.json",
@@ -11,7 +11,7 @@
   "active_profile": "linux-ops",
   "profiles": {
     "linux-ops": {
-      "description": "Complementary Linux desktop, operations, monitoring, maintenance, AI-model and script controls with no repeated action signatures per controller."
+      "description": "Unified F1 desktop/model/script surface and X1 focused-window cockpit with HOTCUE diagnostics; no repeated action signatures per controller."
     },
     "blank": {
       "description": "No mappings."

@@ -15,18 +15,70 @@ terminal() {
   foot --title="$title" fish -lc "$command_text; echo; read -P 'Press Enter to close…'" >/dev/null 2>&1 &
 }
 
+window_preset() {
+  local preset="${1:-center}"
+  command -v swaymsg >/dev/null || return 1
+  command -v jq >/dev/null || { notify "Install jq for window presets."; return 1; }
+
+  local output_name output_json rect x y width height margin=24
+  output_name="$(swaymsg -t get_workspaces -r | jq -r '.[] | select(.focused) | .output' | head -n1)"
+  [[ -n "$output_name" && "$output_name" != "null" ]] || return 1
+  output_json="$(swaymsg -t get_outputs -r | jq -c --arg name "$output_name" '.[] | select(.name == $name and .active)')"
+  [[ -n "$output_json" ]] || return 1
+  rect="$(jq -c '.rect' <<<"$output_json")"
+  x="$(jq -r '.x' <<<"$rect")"
+  y="$(jq -r '.y' <<<"$rect")"
+  width="$(jq -r '.width' <<<"$rect")"
+  height="$(jq -r '.height' <<<"$rect")"
+
+  local tx ty tw th
+  case "$preset" in
+    left)
+      tx=$((x + margin)); ty=$((y + margin))
+      tw=$(((width - margin * 3) / 2)); th=$((height - margin * 2)) ;;
+    right)
+      tw=$(((width - margin * 3) / 2)); th=$((height - margin * 2))
+      tx=$((x + width - margin - tw)); ty=$((y + margin)) ;;
+    top)
+      tx=$((x + margin)); ty=$((y + margin))
+      tw=$((width - margin * 2)); th=$(((height - margin * 3) / 2)) ;;
+    bottom)
+      tw=$((width - margin * 2)); th=$(((height - margin * 3) / 2))
+      tx=$((x + margin)); ty=$((y + height - margin - th)) ;;
+    max)
+      tx=$((x + margin)); ty=$((y + margin))
+      tw=$((width - margin * 2)); th=$((height - margin * 2)) ;;
+    pip)
+      tw=$((width * 38 / 100)); th=$((height * 38 / 100))
+      tx=$((x + width - margin - tw)); ty=$((y + height - margin - th)) ;;
+    reset)
+      swaymsg 'floating disable, opacity set 1, border normal' >/dev/null
+      return 0 ;;
+    center|*)
+      tw=$((width * 72 / 100)); th=$((height * 76 / 100))
+      tx=$((x + (width - tw) / 2)); ty=$((y + (height - th) / 2)) ;;
+  esac
+
+  swaymsg "floating enable, resize set width ${tw} px, resize set height ${th} px, move absolute position ${tx} px ${ty} px" >/dev/null
+}
+
 case "$ACTION" in
   clipboard-history)
     if command -v cliphist >/dev/null && command -v wofi >/dev/null; then
       selection="$(cliphist list | wofi --dmenu --prompt 'Clipboard')" || exit 0
       [[ -n "$selection" ]] && printf '%s' "$selection" | cliphist decode | wl-copy
-    else notify "Install cliphist, wl-clipboard and wofi for clipboard history."; fi
-    ;;
+    else notify "Install cliphist, wl-clipboard and wofi for clipboard history."; fi ;;
   notifications)
     if command -v swaync-client >/dev/null; then swaync-client -t
     elif command -v makoctl >/dev/null; then makoctl restore
-    else notify "No supported notification-center command found."; fi
-    ;;
+    else notify "No supported notification-center command found."; fi ;;
+  notification-dnd)
+    if command -v swaync-client >/dev/null; then swaync-client -d
+    elif command -v makoctl >/dev/null; then
+      current="$(makoctl mode 2>/dev/null || true)"
+      if grep -q 'do-not-disturb' <<<"$current"; then makoctl mode -r do-not-disturb
+      else makoctl mode -a do-not-disturb; fi
+    else notify "No supported do-not-disturb command found."; fi ;;
   quick-settings)
     choice="$(printf 'Audio\nNetwork\nBluetooth\nDisplays\nController config\nController logs\nPower\n' |
       wofi --dmenu --prompt 'Quick settings')" || exit 0
@@ -40,13 +92,12 @@ case "$ACTION" in
       "Controller config") terminal "Controller configuration" "nano '$CONFIG_DIR/config.json'" ;;
       "Controller logs") terminal "Controller logs" "journalctl --user -u traktor-system-controller.service -f" ;;
       Power) "$0" power-menu ;;
-    esac
-    ;;
+    esac ;;
+  window-preset) window_preset "${2:-center}" ;;
   network-settings) terminal "Network settings" "nmtui" ;;
   bluetooth-settings)
     if command -v blueman-manager >/dev/null; then blueman-manager >/dev/null 2>&1 &
-    else terminal "Bluetooth" "bluetoothctl"; fi
-    ;;
+    else terminal "Bluetooth" "bluetoothctl"; fi ;;
   dashboard) terminal "System dashboard" "btop" ;;
   controller-config) terminal "Controller configuration" "nano '$CONFIG_DIR/config.json'" ;;
   controller-layout) terminal "Controller layout" "traktor-system-controller --show-layout" ;;
@@ -56,8 +107,7 @@ case "$ACTION" in
     target="$HOME/Pictures/Screenshots/$(date +%Y%m%d-%H%M%S).png"
     geometry="$(slurp)" || exit 0
     grim -g "$geometry" "$target"
-    notify "Screenshot saved to $target"
-    ;;
+    notify "Screenshot saved to $target" ;;
   screen-record-toggle)
     pidfile="$STATE_DIR/wf-recorder.pid"
     if [[ -s "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
@@ -70,12 +120,10 @@ case "$ACTION" in
       wf-recorder -f "$target" >/dev/null 2>&1 &
       echo $! > "$pidfile"
       notify "Screen recording started: $target"
-    fi
-    ;;
+    fi ;;
   model-state)
     file="$CONFIG_DIR/model-controls.json"
-    terminal "Model controls" "if test -f '$file'; jq . '$file' 2>/dev/null || cat '$file'; else echo 'Move a mapped model knob first.'; end"
-    ;;
+    terminal "Model controls" "if test -f '$file'; jq . '$file' 2>/dev/null || cat '$file'; else echo 'Move a mapped model control first.'; end" ;;
   ollama-status) terminal "Ollama status" "ollama ps" ;;
   ollama-models) terminal "Ollama models" "ollama list" ;;
   journal-errors) terminal "Boot errors" "journalctl -b -p err --no-pager" ;;
@@ -103,7 +151,6 @@ case "$ACTION" in
       Suspend) systemctl suspend ;;
       Reboot) zenity --question --text='Reboot now?' && systemctl reboot ;;
       "Power off") zenity --question --text='Power off now?' && systemctl poweroff ;;
-    esac
-    ;;
+    esac ;;
   *) printf 'Unknown system action: %s\n' "$ACTION" >&2; exit 2 ;;
 esac
