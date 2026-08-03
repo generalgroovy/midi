@@ -66,6 +66,19 @@ class ActionDispatcher(BaseActionDispatcher):
         takeover = bool(mapping.get("take_ownership", True))
         reset_at_max = bool(mapping.get("reset_at_max", True))
 
+        if self.log_actions or self.dry_run:
+            log(
+                f"action=color_temperature_absolute kelvin={kelvin} "
+                f"method={method} takeover={takeover} "
+                f"debounce_ms={round(delay * 1000)}"
+            )
+        if self.dry_run:
+            self._run(
+                ["gammastep", "-P", "-m", method, "-O", str(kelvin)],
+                "color_temperature_absolute",
+            )
+            return
+
         prefix = ""
         if takeover:
             prefix = (
@@ -80,16 +93,6 @@ class ActionDispatcher(BaseActionDispatcher):
                 prefix
                 + f"exec gammastep -P -m {quoted_method} -O {int(kelvin)}"
             )
-
-        if self.log_actions or self.dry_run:
-            log(
-                f"action=color_temperature_absolute kelvin={kelvin} "
-                f"method={method} takeover={takeover} "
-                f"debounce_ms={round(delay * 1000)}"
-            )
-        if self.dry_run:
-            self._run(command, "color_temperature_absolute")
-            return
 
         if self.color_temperature_timer:
             self.color_temperature_timer.cancel()
