@@ -1,4 +1,6 @@
-# Traktor X1/F1 Linux System Controller
+# MIDILIN — Traktor X1/F1 Linux System Controller
+
+Linux/Sway sibling of [MIDIWIN](https://github.com/generalgroovy/midiwin).
 
 Use a Native Instruments Traktor Kontrol F1 and X1 MK1 as complementary Garuda
 Sway control surfaces.
@@ -11,11 +13,6 @@ Sway control surfaces.
 The validator rejects repeated enabled action signatures on the same controller.
 
 ![Unified physical controller overview](assets/layout-overview.svg)
-
-The overview follows the physical front-panel layout of the actual controllers:
-black hardware body, knobs and faders in their real positions, RGB pad matrix,
-transport controls and separated action groups. Detailed mappings remain defined
-by `defaults/f1.json` and `defaults/x1.json`.
 
 ## Unified default highlights
 
@@ -37,41 +34,12 @@ The close-window action has exactly one default binding.
 ## Install, reconcile local branches and run
 
 ```fish
-curl -L https://raw.githubusercontent.com/generalgroovy/midi/main/setup-and-run.fish \
-  -o /tmp/setup-midi.fish
-fish /tmp/setup-midi.fish
+curl -L https://raw.githubusercontent.com/generalgroovy/midilin/main/setup-and-run.fish \
+  -o /tmp/setup-midilin.fish
+fish /tmp/setup-midilin.fish
 ```
-
-For an existing checkout, the script:
-
-1. fetches the remote;
-2. preserves the current commit as `backup/local-before-unify-<timestamp>`;
-3. stashes tracked and untracked local changes;
-4. recreates local `main` from `origin/main`;
-5. backs up and replaces the installed default configuration;
-6. restarts and validates the user service.
 
 Unplug and reconnect both controllers after installation when udev rules change.
-
-## Color-temperature behavior
-
-The F1 color-temperature fader debounces the hardware event stream, stops stale
-Gammastep or Wlsunset ownership, explicitly uses the Wayland adjustment backend,
-clears existing gamma ramps before applying a temperature, and resets to neutral
-at the top endpoint.
-
-Default options are configurable in `defaults/f1.json`:
-
-```json
-{
-  "minimum_kelvin": 2500,
-  "maximum_kelvin": 6500,
-  "adjustment_method": "wayland",
-  "debounce_ms": 180,
-  "take_ownership": true,
-  "reset_at_max": true
-}
-```
 
 ## Verify
 
@@ -108,30 +76,17 @@ journalctl --user -u traktor-system-controller.service -f
 ~/.config/traktor-system-controller/defaults/x1.json
 ```
 
-Controller-light brightness persists at:
-
-```text
-~/.config/traktor-system-controller/controller-brightness
-```
-
-Model values persist at:
-
-```text
-~/.config/traktor-system-controller/model-controls.json
-```
-
-## Connection consent and LED output
-
-On connection, choose use once, always use, ignore once or never use. The F1
-uses HID RGB output. X1 raw USB mode drives button LEDs and restores its kernel
-driver during clean shutdown; evdev fallback remains available without X1 LEDs.
-
 ## Documentation
 
 - [`docs/LAYOUT.md`](docs/LAYOUT.md)
 - [`docs/VISUAL_MAPPING.md`](docs/VISUAL_MAPPING.md)
 - [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
 - [`docs/SYSTEM_ACTIONS.md`](docs/SYSTEM_ACTIONS.md)
+
+## Related project
+
+- Linux/Sway: **MIDILIN** — this repository
+- Windows: **[MIDIWIN](https://github.com/generalgroovy/midiwin)**
 
 ## License
 
