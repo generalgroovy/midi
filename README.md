@@ -10,9 +10,12 @@ Sway control surfaces.
 
 The validator rejects repeated enabled action signatures on the same controller.
 
-![F1 layout](assets/f1-linux-ops.svg)
+![Unified physical controller overview](assets/layout-overview.svg)
 
-![X1 layout](assets/x1-linux-ops.svg)
+The overview follows the physical front-panel layout of the actual controllers:
+black hardware body, knobs and faders in their real positions, RGB pad matrix,
+transport controls and separated action groups. Detailed mappings remain defined
+by `defaults/f1.json` and `defaults/x1.json`.
 
 ## Unified default highlights
 
