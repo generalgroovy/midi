@@ -27,6 +27,21 @@ case "$ACTION" in
     elif command -v makoctl >/dev/null; then makoctl restore
     else notify "No supported notification-center command found."; fi
     ;;
+  quick-settings)
+    choice="$(printf 'Audio\nNetwork\nBluetooth\nDisplays\nController config\nController logs\nPower\n' |
+      wofi --dmenu --prompt 'Quick settings')" || exit 0
+    case "$choice" in
+      Audio) pavucontrol >/dev/null 2>&1 & ;;
+      Network) terminal "Network settings" "nmtui" ;;
+      Bluetooth)
+        if command -v blueman-manager >/dev/null; then blueman-manager >/dev/null 2>&1 &
+        else terminal "Bluetooth" "bluetoothctl"; fi ;;
+      Displays) wdisplays >/dev/null 2>&1 & ;;
+      "Controller config") terminal "Controller configuration" "nano '$CONFIG_DIR/config.json'" ;;
+      "Controller logs") terminal "Controller logs" "journalctl --user -u traktor-system-controller.service -f" ;;
+      Power) "$0" power-menu ;;
+    esac
+    ;;
   network-settings) terminal "Network settings" "nmtui" ;;
   bluetooth-settings)
     if command -v blueman-manager >/dev/null; then blueman-manager >/dev/null 2>&1 &
