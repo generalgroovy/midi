@@ -92,6 +92,10 @@ class ControllerTests(unittest.TestCase):
             bindings[("f1", "knob_4", "absolute", ())],
         )
         self.assertEqual(
+            "pointer_accel_absolute",
+            bindings[("f1", "fader_2", "absolute", ())],
+        )
+        self.assertEqual(
             "color_temperature_absolute",
             bindings[("f1", "fader_3", "absolute", ())],
         )
@@ -151,16 +155,40 @@ class ControllerTests(unittest.TestCase):
         router.emit(SimpleNamespace(device="x1", control="BTN_20", kind="press", value=1))
         self.assertEqual(["system_info"], fake.actions)
 
-    def test_color_temperature_uses_wayland_reset_and_debounce(self) -> None:
+    def test_pointer_accel_targets_discovered_sway_devices(self) -> None:
         dispatcher = ActionDispatcher(self.config, dry_run=True)
-        commands: list[tuple[list[str] | str, str]] = []
-        dispatcher._run = lambda command, action, confirm=None: commands.append((command, action))
+        commands: list[tuple[str, str]] = []
+        dispatcher._pointer_identifiers = lambda: [
+            "1234:1:USB_Mouse",
+            "1267:2:Touchpad",
+        ]
+        dispatcher._run_sway_command = lambda command, action: (
+            commands.append((command, action)) or True
+        )
+        dispatcher.dispatch(
+            {"action": "pointer_accel_absolute", "debounce_ms": 90},
+            ControlEvent("f1", "fader_2", "absolute", 3072, 0, 4096),
+        )
+        self.assertEqual(2, len(commands))
+        self.assertIn('input "1234:1:USB_Mouse" pointer_accel 0.50', commands[0][0])
+        self.assertIn('input "1267:2:Touchpad" pointer_accel 0.50', commands[1][0])
+
+    def test_color_temperature_dry_run_uses_wayland_reset(self) -> None:
+        dispatcher = ActionDispatcher(self.config, dry_run=True)
+        commands: list[tuple[list[str], str]] = []
+
+        def capture(command, action, timeout=5.0):
+            commands.append((command, action))
+            return True, ""
+
+        dispatcher._run_checked = capture
         dispatcher.dispatch(
             {
                 "action": "color_temperature_absolute",
                 "minimum_kelvin": 2500,
                 "maximum_kelvin": 6500,
                 "adjustment_method": "wayland",
+                "backend": "gammastep",
                 "debounce_ms": 180,
             },
             ControlEvent("f1", "fader_3", "absolute", 2048, 0, 4096),
