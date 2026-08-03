@@ -16,61 +16,39 @@ elif [[ $# -gt 0 ]]; then
 fi
 
 active_package_managers() {
-  local found=1
-  local name
+  local found=1 name
   for name in pacman pamac-daemon pamac-tray garuda-update paru yay; do
-    if pgrep -a -x "$name" 2>/dev/null; then
-      found=0
-    fi
+    if pgrep -a -x "$name" 2>/dev/null; then found=0; fi
   done
   return "$found"
 }
 
 prepare_pacman_lock() {
-  local waited=0
-  local processes=""
-
+  local waited=0 processes=""
   while sudo test -e "$PACMAN_LOCK"; do
     processes="$(active_package_managers || true)"
-
     if [[ -n "$processes" ]]; then
       if (( waited == 0 )); then
-        printf 'Pacman database is in use. Waiting up to %s seconds.\n' \
-          "$PACMAN_WAIT_SECONDS" >&2
+        printf 'Pacman database is in use. Waiting up to %s seconds.\n' "$PACMAN_WAIT_SECONDS" >&2
         printf '%s\n' "$processes" >&2
       fi
-
       if (( waited >= PACMAN_WAIT_SECONDS )); then
-        printf '\nPackage management is still active. Do not remove %s yet.\n' \
-          "$PACMAN_LOCK" >&2
-        printf 'Wait for the process to finish, then rerun this installer.\n' >&2
+        printf '\nPackage management is still active. Do not remove %s yet.\n' "$PACMAN_LOCK" >&2
         exit 1
       fi
-
       sleep 3
       ((waited += 3))
       continue
     fi
-
-    printf '\nFound %s, but no package-manager process is running.\n' \
-      "$PACMAN_LOCK" >&2
-    printf 'This normally means the lock is stale after an interrupted update.\n' >&2
-
+    printf '\nFound %s, but no package-manager process is running.\n' "$PACMAN_LOCK" >&2
     if [[ ! -t 0 ]]; then
-      printf 'Run interactively, verify no package manager is active, then remove the stale lock.\n' >&2
+      printf 'Run interactively before removing a stale lock.\n' >&2
       exit 1
     fi
-
     read -r -p 'Remove the stale Pacman lock and continue? [y/N] ' answer
     case "$answer" in
-      y|Y|yes|YES|Yes)
-        sudo rm -f -- "$PACMAN_LOCK"
-        printf 'Removed stale Pacman lock.\n'
-        ;;
-      *)
-        printf 'Installer stopped without changing the lock.\n' >&2
-        exit 1
-        ;;
+      y|Y|yes|YES|Yes) sudo rm -f -- "$PACMAN_LOCK" ;;
+      *) exit 1 ;;
     esac
   done
 }
@@ -78,15 +56,17 @@ prepare_pacman_lock() {
 prepare_pacman_lock
 
 sudo pacman -S --needed \
-  python python-evdev python-hidapi python-pyusb playerctl libnotify wireplumber \
-  brightnessctl gammastep wlsunset easyeffects usbutils hid-tools evtest xdg-utils jq \
+  python tk python-evdev python-hidapi python-pyusb playerctl libnotify wireplumber \
+  brightnessctl ddcutil gammastep wlsunset easyeffects usbutils hid-tools evtest xdg-utils jq \
   foot wofi zenity grim slurp pavucontrol swaylock qpwgraph \
   btop ncdu bmon fastfetch lm_sensors cliphist wl-clipboard wf-recorder \
-  wdisplays blueman pacman-contrib
+  wdisplays blueman pacman-contrib desktop-file-utils
 
-mkdir -p "$HOME/.local/bin" "$LIB_DIR" "$CONFIG_DIR/defaults" \
-  "$CONFIG_DIR/hooks" "$CONFIG_DIR/scripts"
+mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications" \
+  "$LIB_DIR" "$CONFIG_DIR/defaults" "$CONFIG_DIR/hooks" "$CONFIG_DIR/scripts"
 install -m755 "$HERE/traktor-controller.py" "$HOME/.local/bin/traktor-system-controller"
+install -m755 "$HERE/midilin-gui" "$HOME/.local/bin/midilin-gui"
+install -Dm644 "$HERE/midilin.desktop" "$HOME/.local/share/applications/midilin.desktop"
 install -m644 "$HERE/traktor-system-controller.py" "$LIB_DIR/backend.py"
 rm -rf "$LIB_DIR/traktor_controller" "$LIB_DIR/helpers"
 cp -a "$HERE/traktor_controller" "$LIB_DIR/traktor_controller"
@@ -99,8 +79,7 @@ install -m644 "$HERE/config.blank.json" "$CONFIG_DIR/config.blank.json"
 cp -a "$HERE/defaults/." "$CONFIG_DIR/defaults/"
 
 if [[ ! -e "$CONFIG_DIR/hooks/model-controls-updated" ]]; then
-  install -m755 "$HERE/examples/model-controls-updated" \
-    "$CONFIG_DIR/hooks/model-controls-updated"
+  install -m755 "$HERE/examples/model-controls-updated" "$CONFIG_DIR/hooks/model-controls-updated"
 fi
 
 if $RESET_CONFIG && [[ -e "$CONFIG_DIR/config.json" ]]; then
@@ -122,27 +101,27 @@ sudo udevadm control --reload-rules
 sudo udevadm trigger --subsystem-match=input || true
 sudo udevadm trigger --subsystem-match=hidraw || true
 sudo udevadm trigger --subsystem-match=usb || true
+update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
 
 systemctl --user daemon-reload
 systemctl --user enable traktor-system-controller.service
 
 cat <<'EOF'
 
-Installed.
+MIDILIN installed.
 
 1. Unplug and reconnect the X1 and F1.
-2. Validate:
-     traktor-system-controller --validate-config
-     traktor-system-controller --show-layout
-3. Import Sway environment and start:
+2. Import the Sway environment and restart:
      systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP XDG_RUNTIME_DIR
      systemctl --user restart traktor-system-controller.service
-4. A graphical consent prompt appears when each controller connects.
+3. Open the GUI from the application launcher as "MIDILIN Controller Console",
+   or run:
+     midilin-gui
 
 Useful commands:
+  traktor-system-controller --validate-config
   traktor-system-controller --list-devices
-  traktor-system-controller --list-themes
-  traktor-system-controller --set-theme neon
-  traktor-system-controller --approve-connected
-  traktor-system-controller --dry-run
+  traktor-system-controller --diagnose-display
+  traktor-system-controller --set-brightness 50
+  traktor-system-controller --set-temperature 4500
 EOF
