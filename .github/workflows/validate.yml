@@ -2,10 +2,20 @@ name: Validate
 
 on:
   push:
+    branches:
+      - main
+      - "agent/**"
   pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: midilin-validate-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate:
@@ -25,6 +35,11 @@ jobs:
           TRAKTOR_CONTROLLER_BACKEND=$PWD/traktor-system-controller.py python traktor-controller.py --config config.default.json --validate-config
       - name: Run tests
         run: python -m unittest discover -s tests -v
+      - name: Validate JSON status
+        run: |
+          TRAKTOR_CONTROLLER_BACKEND=$PWD/traktor-system-controller.py \
+            python traktor-controller.py --config config.default.json --json-status > status.json
+          python -m json.tool status.json >/dev/null
       - name: Validate shell
         run: bash -n install.sh helpers/system-actions examples/model-controls-updated
       - name: Validate SVG assets
