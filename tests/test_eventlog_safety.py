@@ -50,6 +50,22 @@ class EventLogRetentionTests(unittest.TestCase):
                     ["mapping_selected"],
                 )
 
+    def test_off_mode_creates_no_ledger(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            target = Path(raw) / "events.jsonl"
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MIDILIN_EVENT_LOG": str(target),
+                    "MIDILIN_EVENT_LOG_MODE": "off",
+                },
+                clear=False,
+            ):
+                event = emit("mapping_selected", action="volume_absolute")
+                self.assertEqual(event["kind"], "mapping_selected")
+                self.assertFalse(target.exists())
+                self.assertEqual(read_tail(10), [])
+
     def test_invalid_limits_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with mock.patch.dict(
