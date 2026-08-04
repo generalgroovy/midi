@@ -67,11 +67,20 @@ def _profiles(mapping: dict[str, Any], prefix: str,
     if value is None:
         return ("*",)
     if isinstance(value, str):
-        return (value,)
+        value = [value]
     if not isinstance(value, list):
         errors.append(f"{prefix} profile/profiles must be a string or array")
         return ()
-    return tuple(sorted(str(item).strip() for item in value if str(item).strip()))
+    profiles = tuple(sorted(str(item).strip() for item in value if str(item).strip()))
+    if not profiles:
+        errors.append(f"{prefix} profile/profiles must not be empty")
+    if len(profiles) != len(set(profiles)):
+        errors.append(f"{prefix} profile/profiles contains duplicates")
+    return profiles
+
+
+def _profiles_overlap(left: tuple[str, ...], right: tuple[str, ...]) -> bool:
+    return "*" in left or "*" in right or bool(set(left).intersection(right))
 
 
 def validate_config(config: dict[str, Any]) -> list[str]:
@@ -84,7 +93,8 @@ def validate_config(config: dict[str, Any]) -> list[str]:
     known_actions = set(config.get("actions", {})) | BUILTIN_ACTIONS
     signatures: dict[tuple[str, str], int] = {}
     collisions: dict[
-        tuple[str, str, str, tuple[str, ...], tuple[str, ...], tuple[str, ...]], int
+        tuple[str, str, str, tuple[str, ...], tuple[str, ...]],
+        list[tuple[int, tuple[str, ...]]],
     ] = {}
     enforce_unique = bool(config.get("layout_rules", {}).get(
         "no_repeated_actions_per_controller", True
@@ -121,15 +131,16 @@ def validate_config(config: dict[str, Any]) -> list[str]:
             str(mapping.get("kind", "")),
             requires,
             unless,
-            profiles,
         )
-        if collision_key in collisions:
-            errors.append(
-                f"{prefix} is ambiguous with mappings[{collisions[collision_key]}]: "
-                "same input, conditions and profile"
-            )
-        else:
-            collisions[collision_key] = index
+        prior_records = collisions.setdefault(collision_key, [])
+        for prior_index, prior_profiles in prior_records:
+            if _profiles_overlap(prior_profiles, profiles):
+                errors.append(
+                    f"{prefix} is ambiguous with mappings[{prior_index}]: "
+                    "same input and conditions in overlapping profiles"
+                )
+                break
+        prior_records.append((index, profiles))
         if enforce_unique:
             key = (str(mapping.get("device", "")), _mapping_signature(mapping))
             if key in signatures:
