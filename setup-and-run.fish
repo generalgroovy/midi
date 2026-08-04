@@ -28,7 +28,8 @@ else
     git -C "$repo" branch "$backup_branch" HEAD >/dev/null 2>&1
     or true
 
-    if test -n "$(git -C "$repo" status --porcelain)"
+    set -l worktree_status (git -C "$repo" status --porcelain)
+    if test -n "$worktree_status"
         git -C "$repo" stash push --include-untracked \
             --message "MIDILIN setup backup $stamp"; or exit 1
     end
