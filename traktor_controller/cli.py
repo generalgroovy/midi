@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any
 
 from .common import BUILTIN_ACTIONS, DEFAULT_CONFIG, load_config
-from .eventlog import clear as clear_events
-from .eventlog import emit, event_path, read_tail
+from .eventlog import backup_count, clear as clear_events
+from .eventlog import emit, event_files, event_path, log_mode, max_bytes, read_tail
 from .router import EventRouter
 from .unified_actions import ActionDispatcher
 
@@ -200,17 +200,19 @@ def show_model_state(config: dict[str, Any]) -> int:
 def _service_state() -> dict[str, Any]:
     command = [
         "systemctl", "--user", "show", "traktor-system-controller.service",
-        "--property=LoadState,ActiveState,SubState,MainPID", "--no-pager",
+        "--property=LoadState,ActiveState,SubState,MainPID,NRestarts,Result,ExecMainStatus",
+        "--no-pager",
     ]
     try:
         result = subprocess.run(command, text=True, capture_output=True, timeout=5, check=False)
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
         return {"available": False, "error": str(exc)}
     values: dict[str, Any] = {"available": result.returncode == 0}
+    integer_fields = {"MainPID", "NRestarts", "ExecMainStatus"}
     for line in result.stdout.splitlines():
         if "=" in line:
             key, value = line.split("=", 1)
-            values[key] = int(value) if key == "MainPID" and value.isdigit() else value
+            values[key] = int(value) if key in integer_fields and value.isdigit() else value
     if result.returncode != 0:
         values["error"] = (result.stderr or result.stdout).strip()
     return values
@@ -220,6 +222,14 @@ def _json_status(config_path: Path, config: dict[str, Any]) -> dict[str, Any]:
     errors = validate_config(config)
     controls = config.get("display_controls", {})
     path = event_path()
+    segments = [
+        {
+            "path": str(segment),
+            "exists": segment.exists(),
+            "bytes": segment.stat().st_size if segment.exists() else 0,
+        }
+        for segment in event_files(path)
+    ]
     return {
         "schema_version": 1,
         "application": "midilin",
@@ -247,8 +257,11 @@ def _json_status(config_path: Path, config: dict[str, Any]) -> dict[str, Any]:
         "display_controls": controls if isinstance(controls, dict) else {},
         "event_log": {
             "path": str(path),
-            "exists": path.exists(),
-            "bytes": path.stat().st_size if path.exists() else 0,
+            "mode": log_mode(),
+            "max_bytes": max_bytes(),
+            "backup_count": backup_count(),
+            "segments": segments,
+            "total_bytes": sum(int(segment["bytes"]) for segment in segments),
             "recent_events": len(read_tail(100)),
         },
     }
@@ -351,8 +364,9 @@ def main() -> int:
         dry_run=args.dry_run,
         config=str(config_path.resolve()),
         event_log=str(event_path()),
+        event_log_mode=log_mode(),
     )
-    print(f"Structured event log: {event_path()}")
+    print(f"Structured event log: {event_path()} ({log_mode()} mode)")
     runtime = backend.ControllerRuntime(
         EventRouter(config, monitor=args.monitor, profile=args.profile, dry_run=args.dry_run),
         config=config, visual_theme=args.visual_theme,
@@ -365,3 +379,7 @@ def main() -> int:
         return 0
     emit("runtime_stopped", reason="normal", pid=os.getpid())
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
