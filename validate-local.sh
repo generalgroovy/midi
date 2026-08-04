@@ -50,8 +50,21 @@ if status.get("schema_version") != 1:
     raise SystemExit(f"unexpected schema version: {status.get('schema_version')!r}")
 if not status.get("config_valid"):
     raise SystemExit("default configuration is not valid: " + "; ".join(status.get("config_errors", [])))
-if not isinstance(status.get("event_log"), dict):
+event_log = status.get("event_log")
+if not isinstance(event_log, dict):
     raise SystemExit("status is missing event_log metadata")
+if event_log.get("mode") not in {"full", "actions", "off"}:
+    raise SystemExit(f"invalid event-log mode: {event_log.get('mode')!r}")
+if not isinstance(event_log.get("max_bytes"), int) or event_log["max_bytes"] < 1024:
+    raise SystemExit("status is missing a valid event-log size limit")
+if not isinstance(event_log.get("backup_count"), int) or event_log["backup_count"] < 1:
+    raise SystemExit("status is missing a valid event-log backup count")
+segments = event_log.get("segments")
+if not isinstance(segments, list) or len(segments) != event_log["backup_count"] + 1:
+    raise SystemExit("status event-log segment inventory is inconsistent")
+service = status.get("service")
+if not isinstance(service, dict) or "available" not in service:
+    raise SystemExit("status is missing systemd service metadata")
 print("MIDILIN_JSON_STATUS_OK")
 PY
 
