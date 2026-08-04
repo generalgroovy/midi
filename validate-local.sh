@@ -28,7 +28,8 @@ TRAKTOR_CONTROLLER_BACKEND="$backend" \
   --validate-config
 
 printf '\n== Unit and integration tests ==\n'
-"$python_bin" -m unittest discover -s tests -v
+WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-test}" \
+  "$python_bin" -m unittest discover -s tests -v
 
 printf '\n== Structured status contract ==\n'
 TRAKTOR_CONTROLLER_BACKEND="$backend" \
