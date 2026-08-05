@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Compatibility backend module loaded by traktor_controller.cli."""
+from traktor_controller.autocode_visuals import install as install_autocode_visuals
 from traktor_controller.hardware import (
     ConnectionConsent,
     ControllerRuntime,
@@ -8,6 +9,8 @@ from traktor_controller.hardware import (
     list_devices,
 )
 from traktor_controller.visuals import F1Visual, THEMES, X1Visual, set_theme
+
+install_autocode_visuals()
 
 __all__ = [
     "ConnectionConsent", "ControllerRuntime", "F1Visual", "THEMES", "X1Visual",
