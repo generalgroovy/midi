@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from .autocode import dispatch as dispatch_autocode
 from .common import ControlEvent, X1_DEFAULT_ALIASES, log
 from .eventlog import emit as emit_event
 from .unified_actions import ActionDispatcher
@@ -77,6 +78,18 @@ class EventRouter:
             source=str(getattr(event, "source", "")), raw_control=raw,
         )
 
+    def _dispatch(self, mapping: dict[str, Any], event: ControlEvent) -> None:
+        action = str(mapping.get("action", ""))
+        if action.startswith("autocode_"):
+            selected = action.removeprefix("autocode_").replace("_", "-")
+            dispatch_autocode(
+                self.config,
+                selected,
+                dry_run=self.dry_run,
+            )
+            return
+        self.dispatcher.dispatch(mapping, event)
+
     def emit(self, raw_event: Any) -> None:
         event = self._normalize(raw_event)
         held_key = (event.device, event.control)
@@ -139,7 +152,7 @@ class EventRouter:
                         unless=mapping.get("unless", []),
                         held=[f"{device}.{control}" for device, control in sorted(self.held)],
                     )
-                    self.dispatcher.dispatch(mapping, event)
+                    self._dispatch(mapping, event)
             if matched == 0:
                 emit_event(
                     "mapping_unmatched",
