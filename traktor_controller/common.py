@@ -23,7 +23,7 @@ BUILTIN_ACTIONS = {
     "window_width_absolute", "window_height_absolute",
     "window_opacity_absolute", "window_border_absolute", "window_output_absolute",
     "model_parameter_absolute", "model_parameter_relative",
-    "script_slot",
+    "script_slot", "autocode_action",
 }
 
 X1_DEFAULT_ALIASES = {
