@@ -1,0 +1,38 @@
+{
+  "autocode": {
+    "enabled": true,
+    "binary": "autocode-local",
+    "workspace": "~/Projects/flux2",
+    "state_file": "~/.local/state/autocode/midi/state.json",
+    "poll_seconds": 0.25,
+    "f1_indicator": "grid_16",
+    "x1_indicator": "hotcue"
+  },
+  "profiles": {
+    "autocode-ops": {
+      "description": "Dedicated F1/X1 Autocode control surface with safe fixed actions and persistent status LEDs."
+    }
+  },
+  "mappings": [
+    {"profile":"autocode-ops","device":"f1","control":"grid_1","kind":"press","action":"autocode_open","enabled":true},
+    {"profile":"autocode-ops","device":"f1","control":"grid_2","kind":"press","action":"autocode_status","enabled":true},
+    {"profile":"autocode-ops","device":"f1","control":"grid_3","kind":"press","action":"autocode_pause","enabled":true},
+    {"profile":"autocode-ops","device":"f1","control":"grid_4","kind":"press","action":"autocode_resume","enabled":true},
+    {"profile":"autocode-ops","device":"f1","control":"grid_5","kind":"press","action":"autocode_stop","enabled":true},
+    {"profile":"autocode-ops","device":"f1","control":"grid_6","kind":"press","action":"autocode_cancel","enabled":true},
+    {"profile":"autocode-ops","device":"f1","control":"grid_7","kind":"press","action":"autocode_overnight_stop","enabled":true},
+    {"profile":"autocode-ops","device":"f1","control":"grid_8","kind":"press","action":"autocode_morning","enabled":true},
+    {"profile":"autocode-ops","device":"f1","control":"grid_9","kind":"press","action":"autocode_acknowledge","enabled":true},
+    {"profile":"autocode-ops","device":"f1","control":"grid_10","kind":"press","action":"autocode_cue_test","enabled":true},
+    {"profile":"autocode-ops","device":"x1","control":"deck_a_in","kind":"press","action":"autocode_open","enabled":true},
+    {"profile":"autocode-ops","device":"x1","control":"deck_a_out","kind":"press","action":"autocode_status","enabled":true},
+    {"profile":"autocode-ops","device":"x1","control":"deck_a_beat_left","kind":"press","action":"autocode_pause","enabled":true},
+    {"profile":"autocode-ops","device":"x1","control":"deck_a_beat_right","kind":"press","action":"autocode_resume","enabled":true},
+    {"profile":"autocode-ops","device":"x1","control":"deck_a_cue","kind":"press","action":"autocode_stop","enabled":true},
+    {"profile":"autocode-ops","device":"x1","control":"deck_a_cup","kind":"press","action":"autocode_cancel","enabled":true},
+    {"profile":"autocode-ops","device":"x1","control":"deck_a_play","kind":"press","action":"autocode_overnight_stop","enabled":true},
+    {"profile":"autocode-ops","device":"x1","control":"deck_a_sync","kind":"press","action":"autocode_acknowledge","enabled":true},
+    {"profile":"autocode-ops","device":"x1","control":"deck_b_in","kind":"press","action":"autocode_morning","enabled":true},
+    {"profile":"autocode-ops","device":"x1","control":"deck_b_out","kind":"press","action":"autocode_cue_test","enabled":true}
+  ]
+}
