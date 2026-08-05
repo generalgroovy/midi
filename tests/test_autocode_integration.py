@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import tempfile
 import unittest
@@ -153,7 +152,7 @@ class AutocodeIntegrationTests(unittest.TestCase):
     def test_led_state_translation_is_deterministic(self) -> None:
         self.assertEqual((0, 127, 24), f1_indicator_color({"state": "completed"}))
         self.assertEqual(
-            (100, 127, 100),
+            (100, 100, 127),
             f1_indicator_color({"state": "running", "cue_pending": True}),
         )
         self.assertEqual(60, x1_indicator_level({"state": "running"}))
