@@ -105,7 +105,14 @@ class RouterEvidenceTests(unittest.TestCase):
                     }
                 ],
             }
-            with mock.patch.dict(os.environ, {"MIDILIN_EVENT_LOG": str(target)}):
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MIDILIN_EVENT_LOG": str(target),
+                    "MIDILIN_EVENT_LOG_MODE": "full",
+                },
+                clear=False,
+            ):
                 router = EventRouter(config, monitor=False, dry_run=True)
                 with mock.patch.object(router.dispatcher, "dispatch") as dispatch:
                     router.emit(SimpleNamespace(
