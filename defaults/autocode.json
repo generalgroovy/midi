@@ -1,6 +1,6 @@
 {
   "autocode": {
-    "enabled": true,
+    "enabled": false,
     "binary": "autocode-local",
     "workspace": "~/Projects/flux2",
     "state_file": "~/.local/state/autocode/midi/state.json",
@@ -10,7 +10,7 @@
   },
   "profiles": {
     "autocode-ops": {
-      "description": "Dedicated F1/X1 Autocode control surface with safe fixed actions and persistent status LEDs."
+      "description": "Optional dedicated F1/X1 Autocode surface. Keep linux-ops active for normal desktop/media/window controls."
     }
   },
   "mappings": [
