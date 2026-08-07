@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import threading
 from typing import Any
 
@@ -54,14 +55,18 @@ class _AutocodeOverlay:
     def _initialize_autocode_overlay(self, config: dict[str, Any]) -> None:
         self._autocode_config = config
         self._autocode_stop = threading.Event()
+        self._autocode_thread: threading.Thread | None = None
         self._autocode_state: dict[str, Any] = {
             "available": False,
             "state": "idle",
             "cue_pending": False,
         }
+        # Normal MIDILIN operation must have zero Autocode background work.
+        if not enabled(config):
+            return
         try:
             self._autocode_state = read_state(config)
-        except (OSError, RuntimeError, ValueError):
+        except (OSError, RuntimeError, ValueError, json.JSONDecodeError):
             pass
         interval = float(settings(config).get("poll_seconds", 0.25))
         self._autocode_thread = threading.Thread(
@@ -76,7 +81,7 @@ class _AutocodeOverlay:
         while not self._autocode_stop.wait(interval):
             try:
                 value = read_state(self._autocode_config)
-            except (OSError, RuntimeError, ValueError):
+            except (OSError, RuntimeError, ValueError, json.JSONDecodeError):
                 value = {
                     "available": False,
                     "state": "idle",
@@ -122,7 +127,8 @@ class AutocodeF1Visual(_AutocodeOverlay, BaseF1Visual):
         }
         super().__init__(device, config, theme)
         self._initialize_autocode_overlay(config)
-        self._render()
+        if enabled(config):
+            self._render()
 
     def _render(self) -> None:
         super()._render()
@@ -161,7 +167,8 @@ class AutocodeX1Visual(_AutocodeOverlay, BaseX1Visual):
         }
         super().__init__(device, config, theme)
         self._initialize_autocode_overlay(config)
-        self._render()
+        if enabled(config):
+            self._render()
 
     def _render(self) -> None:
         super()._render()
