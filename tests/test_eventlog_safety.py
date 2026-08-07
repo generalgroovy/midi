@@ -44,11 +44,51 @@ class EventLogRetentionTests(unittest.TestCase):
             ):
                 emit("control_input", value=1)
                 emit("mapping_unmatched", control="knob_1")
-                emit("mapping_selected", action="volume_absolute")
+                emit("modifier_state", event_kind="press")
+                emit(
+                    "mapping_selected",
+                    action="volume_absolute",
+                    event_kind="absolute",
+                )
+                emit(
+                    "mapping_selected",
+                    action="media_play_pause",
+                    event_kind="press",
+                )
                 self.assertEqual(
                     [item["kind"] for item in read_tail(10)],
                     ["mapping_selected"],
                 )
+
+    def test_default_logging_does_not_fsync_each_controller_event(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            target = Path(raw) / "events.jsonl"
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MIDILIN_EVENT_LOG": str(target),
+                    "MIDILIN_EVENT_LOG_MODE": "full",
+                },
+                clear=False,
+            ), mock.patch("os.fsync") as fsync:
+                emit("mapping_selected", action="media_play_pause", event_kind="press")
+                fsync.assert_not_called()
+                self.assertTrue(target.exists())
+
+    def test_explicit_fsync_mode_remains_available(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            target = Path(raw) / "events.jsonl"
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MIDILIN_EVENT_LOG": str(target),
+                    "MIDILIN_EVENT_LOG_MODE": "full",
+                    "MIDILIN_EVENT_LOG_FSYNC": "1",
+                },
+                clear=False,
+            ), mock.patch("os.fsync") as fsync:
+                emit("mapping_selected", action="media_play_pause", event_kind="press")
+                fsync.assert_called_once()
 
     def test_off_mode_creates_no_ledger(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -66,20 +106,7 @@ class EventLogRetentionTests(unittest.TestCase):
                 self.assertFalse(target.exists())
                 self.assertEqual(read_tail(10), [])
 
-    def test_invalid_limits_fail_closed(self) -> None:
-        with tempfile.TemporaryDirectory() as raw:
-            with mock.patch.dict(
-                os.environ,
-                {
-                    "MIDILIN_EVENT_LOG": str(Path(raw) / "events.jsonl"),
-                    "MIDILIN_EVENT_LOG_MAX_BYTES": "100",
-                },
-                clear=False,
-            ):
-                with self.assertRaisesRegex(ValueError, "between"):
-                    emit("test")
-
-    def test_symbolic_link_log_target_is_rejected(self) -> None:
+    def test_runtime_logging_failure_is_nonfatal_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             outside = root / "outside.jsonl"
@@ -88,7 +115,43 @@ class EventLogRetentionTests(unittest.TestCase):
             target.symlink_to(outside)
             with mock.patch.dict(
                 os.environ,
-                {"MIDILIN_EVENT_LOG": str(target)},
+                {
+                    "MIDILIN_EVENT_LOG": str(target),
+                    "MIDILIN_EVENT_LOG_STRICT": "0",
+                },
+                clear=False,
+            ):
+                event = emit("mapping_selected", action="media_play_pause")
+            self.assertIn("symbolic link", event.get("log_error", ""))
+            self.assertEqual(outside.read_text(encoding="utf-8"), "outside\n")
+
+    def test_invalid_limits_fail_closed_in_strict_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MIDILIN_EVENT_LOG": str(Path(raw) / "events.jsonl"),
+                    "MIDILIN_EVENT_LOG_MAX_BYTES": "100",
+                    "MIDILIN_EVENT_LOG_STRICT": "1",
+                },
+                clear=False,
+            ):
+                with self.assertRaisesRegex(ValueError, "between"):
+                    emit("test")
+
+    def test_symbolic_link_log_target_is_rejected_in_strict_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            outside = root / "outside.jsonl"
+            outside.write_text("outside\n", encoding="utf-8")
+            target = root / "events.jsonl"
+            target.symlink_to(outside)
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "MIDILIN_EVENT_LOG": str(target),
+                    "MIDILIN_EVENT_LOG_STRICT": "1",
+                },
                 clear=False,
             ):
                 with self.assertRaisesRegex(RuntimeError, "symbolic link"):
