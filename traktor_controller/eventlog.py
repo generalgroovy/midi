@@ -20,6 +20,7 @@ _SUPPRESSED_BY_ACTION_MODE = {
     "control_input",
     "input_throttled",
     "mapping_unmatched",
+    "modifier_state",
 }
 
 
@@ -46,6 +47,18 @@ def _bounded_int(name: str, default: int, minimum: int, maximum: int) -> int:
     return value
 
 
+def _boolean_env(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    value = raw.strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off", ""}:
+        return False
+    raise ValueError(f"{name} must be a boolean value")
+
+
 def max_bytes() -> int:
     return _bounded_int(
         "MIDILIN_EVENT_LOG_MAX_BYTES",
@@ -60,10 +73,22 @@ def backup_count() -> int:
 
 
 def log_mode() -> str:
-    mode = os.environ.get("MIDILIN_EVENT_LOG_MODE", "full").strip().lower()
+    # Action-level logging is the safe default for a high-rate controller.
+    mode = os.environ.get("MIDILIN_EVENT_LOG_MODE", "actions").strip().lower()
     if mode not in {"full", "actions", "off"}:
         raise ValueError("MIDILIN_EVENT_LOG_MODE must be full, actions, or off")
     return mode
+
+
+def fsync_enabled() -> bool:
+    # Per-event fsync can stall MIDI/HID dispatch for tens of milliseconds.
+    return _boolean_env("MIDILIN_EVENT_LOG_FSYNC", False)
+
+
+def strict_mode() -> bool:
+    # Runtime observability must not break controller actions. Tests/diagnostics
+    # can explicitly enable strict mode when validating path and retention rules.
+    return _boolean_env("MIDILIN_EVENT_LOG_STRICT", False)
 
 
 def _secure_parent(path: Path) -> None:
@@ -119,11 +144,18 @@ def redact(value: Any) -> Any:
     return value
 
 
-def _should_persist(kind: str) -> bool:
+def _should_persist(kind: str, fields: dict[str, Any]) -> bool:
     mode = log_mode()
     if mode == "off":
         return False
-    return not (mode == "actions" and kind in _SUPPRESSED_BY_ACTION_MODE)
+    if mode != "actions":
+        return True
+    if kind in _SUPPRESSED_BY_ACTION_MODE:
+        return False
+    # Absolute controls can generate dozens of selection events per second.
+    if kind == "mapping_selected" and fields.get("event_kind") == "absolute":
+        return False
+    return True
 
 
 def _rotate_if_needed(path: Path, incoming_bytes: int) -> None:
@@ -164,20 +196,16 @@ def _append(path: Path, line: str) -> None:
         offset = 0
         while offset < len(encoded):
             offset += os.write(fd, encoded[offset:])
-        os.fsync(fd)
+        if fsync_enabled():
+            os.fsync(fd)
     finally:
         os.close(fd)
 
 
-def emit(kind: str, **fields: Any) -> dict[str, Any]:
-    event = {
-        "schema_version": 1,
-        "timestamp": utcnow(),
-        "kind": str(kind),
-        **redact(fields),
-    }
-    if not _should_persist(str(kind)):
-        return event
+def _persist(event: dict[str, Any], fields: dict[str, Any]) -> None:
+    kind = str(event["kind"])
+    if not _should_persist(kind, fields):
+        return
     path = event_path()
     line = json.dumps(
         event,
@@ -189,6 +217,23 @@ def emit(kind: str, **fields: Any) -> dict[str, Any]:
         _secure_parent(path)
         _rotate_if_needed(path, len(line.encode("utf-8")))
         _append(path, line)
+
+
+def emit(kind: str, **fields: Any) -> dict[str, Any]:
+    event = {
+        "schema_version": 1,
+        "timestamp": utcnow(),
+        "kind": str(kind),
+        **redact(fields),
+    }
+    try:
+        _persist(event, fields)
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        if strict_mode():
+            raise
+        # Observability is best effort in the live controller path. Surface the
+        # error to callers without interrupting the mapped action itself.
+        event["log_error"] = f"{type(exc).__name__}: {exc}"
     return event
 
 
