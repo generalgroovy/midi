@@ -127,8 +127,11 @@ journalctl --user -u traktor-system-controller.service -n 80 --no-pager || true
 
 section "8/8 — Result"
 printf 'MIDILIN_UPDATE_TEST_OK head=%s\n' "$local_head"
-printf '\nPhysical input monitor (Ctrl+C to stop):\n'
+printf '\nPhysical input monitor (service must release the controllers first):\n'
+printf '  systemctl --user stop traktor-system-controller.service\n'
 printf '  MIDILIN_EVENT_LOG_MODE=off %q --profile linux-ops --monitor\n' "$installed"
+printf '  # press Ctrl+C after testing, then:\n'
+printf '  systemctl --user restart traktor-system-controller.service\n'
 printf '\nIf the worktree stash was created, inspect it later with:\n'
 if (( stash_created )); then
   printf '  cd %q && git stash list && git stash show --stat stash@{0}\n' "$repo"
