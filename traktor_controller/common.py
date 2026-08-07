@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .eventlog import emit
+
 DEFAULT_CONFIG = Path.home() / ".config/traktor-system-controller/config.json"
 
 BUILTIN_ACTIONS = {
@@ -22,6 +24,9 @@ BUILTIN_ACTIONS = {
     "window_opacity_absolute", "window_border_absolute", "window_output_absolute",
     "model_parameter_absolute", "model_parameter_relative",
     "script_slot",
+    "autocode_status", "autocode_open", "autocode_pause", "autocode_resume",
+    "autocode_stop", "autocode_cancel", "autocode_overnight_stop",
+    "autocode_morning", "autocode_acknowledge", "autocode_cue_test",
 }
 
 X1_DEFAULT_ALIASES = {
@@ -53,6 +58,7 @@ X1_DEFAULT_ALIASES = {
 
 def log(message: str) -> None:
     print(message, flush=True)
+    emit("runtime_log", message=message)
 
 
 def expand_path(value: str | Path) -> Path:
@@ -123,6 +129,13 @@ class ControlEvent:
     maximum: int = 1
     source: str = ""
     raw_control: str = ""
+
+    @property
+    def ratio(self) -> float:
+        span = self.maximum - self.minimum
+        if span <= 0:
+            return 0.0
+        return min(max((self.value - self.minimum) / span, 0.0), 1.0)
 
     def describe(self) -> str:
         raw = (

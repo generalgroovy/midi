@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 from .common import BUILTIN_ACTIONS, DEFAULT_CONFIG, load_config
+from .eventlog import backup_count, clear as clear_events
+from .eventlog import emit, event_files, event_path, log_mode, max_bytes, read_tail
 from .router import EventRouter
 from .unified_actions import ActionDispatcher
 
@@ -42,6 +47,42 @@ def _mapping_signature(mapping: dict[str, Any]) -> str:
     return action
 
 
+def _tokens(mapping: dict[str, Any], field: str, prefix: str,
+            errors: list[str]) -> tuple[str, ...]:
+    value = mapping.get(field, [])
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list):
+        errors.append(f"{prefix} {field} must be a string or array")
+        return ()
+    tokens = tuple(sorted(str(item).strip() for item in value if str(item).strip()))
+    if len(tokens) != len(set(tokens)):
+        errors.append(f"{prefix} {field} contains duplicates")
+    return tokens
+
+
+def _profiles(mapping: dict[str, Any], prefix: str,
+              errors: list[str]) -> tuple[str, ...]:
+    value = mapping.get("profile", mapping.get("profiles"))
+    if value is None:
+        return ("*",)
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list):
+        errors.append(f"{prefix} profile/profiles must be a string or array")
+        return ()
+    profiles = tuple(sorted(str(item).strip() for item in value if str(item).strip()))
+    if not profiles:
+        errors.append(f"{prefix} profile/profiles must not be empty")
+    if len(profiles) != len(set(profiles)):
+        errors.append(f"{prefix} profile/profiles contains duplicates")
+    return profiles
+
+
+def _profiles_overlap(left: tuple[str, ...], right: tuple[str, ...]) -> bool:
+    return "*" in left or "*" in right or bool(set(left).intersection(right))
+
+
 def validate_config(config: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if not isinstance(config.get("actions", {}), dict):
@@ -51,6 +92,10 @@ def validate_config(config: dict[str, Any]) -> list[str]:
         return errors + ["mappings must be an array"]
     known_actions = set(config.get("actions", {})) | BUILTIN_ACTIONS
     signatures: dict[tuple[str, str], int] = {}
+    collisions: dict[
+        tuple[str, str, str, tuple[str, ...], tuple[str, ...]],
+        list[tuple[int, tuple[str, ...]]],
+    ] = {}
     enforce_unique = bool(config.get("layout_rules", {}).get(
         "no_repeated_actions_per_controller", True
     ))
@@ -70,14 +115,41 @@ def validate_config(config: dict[str, Any]) -> list[str]:
             errors.append(f"{prefix} script_slot requires slot")
         if mapping.get("action") in {"model_parameter_absolute", "model_parameter_relative"} and not mapping.get("parameter"):
             errors.append(f"{prefix} model action requires parameter")
-        if enforce_unique and bool(mapping.get("enabled", True)):
+        requires = _tokens(mapping, "requires", prefix, errors)
+        unless = _tokens(mapping, "unless", prefix, errors)
+        profiles = _profiles(mapping, prefix, errors)
+        overlap = sorted(set(requires).intersection(unless))
+        if overlap:
+            errors.append(
+                f"{prefix} requires and excludes the same control(s): {', '.join(overlap)}"
+            )
+        if not bool(mapping.get("enabled", True)):
+            continue
+        collision_key = (
+            str(mapping.get("device", "")),
+            str(mapping.get("control", "")),
+            str(mapping.get("kind", "")),
+            requires,
+            unless,
+        )
+        prior_records = collisions.setdefault(collision_key, [])
+        for prior_index, prior_profiles in prior_records:
+            if _profiles_overlap(prior_profiles, profiles):
+                errors.append(
+                    f"{prefix} is ambiguous with mappings[{prior_index}]: "
+                    "same input and conditions in overlapping profiles"
+                )
+                break
+        prior_records.append((index, profiles))
+        if enforce_unique:
             key = (str(mapping.get("device", "")), _mapping_signature(mapping))
             if key in signatures:
                 errors.append(
                     f"{prefix} repeats {_mapping_signature(mapping)!r} on {key[0]} "
                     f"(already mappings[{signatures[key]}])"
                 )
-            signatures[key] = index
+            else:
+                signatures[key] = index
     parameters = config.get("model_controls", {}).get("parameters", {})
     if not isinstance(parameters, dict):
         errors.append("model_controls.parameters must be an object")
@@ -125,6 +197,76 @@ def show_model_state(config: dict[str, Any]) -> int:
     return 0
 
 
+def _service_state() -> dict[str, Any]:
+    command = [
+        "systemctl", "--user", "show", "traktor-system-controller.service",
+        "--property=LoadState,ActiveState,SubState,MainPID,NRestarts,Result,ExecMainStatus",
+        "--no-pager",
+    ]
+    try:
+        result = subprocess.run(command, text=True, capture_output=True, timeout=5, check=False)
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        return {"available": False, "error": str(exc)}
+    values: dict[str, Any] = {"available": result.returncode == 0}
+    integer_fields = {"MainPID", "NRestarts", "ExecMainStatus"}
+    for line in result.stdout.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            values[key] = int(value) if key in integer_fields and value.isdigit() else value
+    if result.returncode != 0:
+        values["error"] = (result.stderr or result.stdout).strip()
+    return values
+
+
+def _json_status(config_path: Path, config: dict[str, Any]) -> dict[str, Any]:
+    errors = validate_config(config)
+    controls = config.get("display_controls", {})
+    path = event_path()
+    segments = [
+        {
+            "path": str(segment),
+            "exists": segment.exists(),
+            "bytes": segment.stat().st_size if segment.exists() else 0,
+        }
+        for segment in event_files(path)
+    ]
+    return {
+        "schema_version": 1,
+        "application": "midilin",
+        "config": str(config_path.expanduser().resolve()),
+        "config_valid": not errors,
+        "config_errors": errors,
+        "active_profile": str(config.get("active_profile", "linux-ops")),
+        "enabled_mappings": sum(
+            1 for mapping in config.get("mappings", [])
+            if isinstance(mapping, dict) and mapping.get("enabled", True)
+        ),
+        "service": _service_state(),
+        "environment": {
+            "wayland_display": bool(os.environ.get("WAYLAND_DISPLAY")),
+            "sway_socket": bool(os.environ.get("SWAYSOCK")),
+            "xdg_runtime_dir": bool(os.environ.get("XDG_RUNTIME_DIR")),
+        },
+        "backends": {
+            "brightnessctl": shutil.which("brightnessctl"),
+            "ddcutil": shutil.which("ddcutil"),
+            "wlsunset": shutil.which("wlsunset"),
+            "gammastep": shutil.which("gammastep"),
+            "swaymsg": shutil.which("swaymsg"),
+        },
+        "display_controls": controls if isinstance(controls, dict) else {},
+        "event_log": {
+            "path": str(path),
+            "mode": log_mode(),
+            "max_bytes": max_bytes(),
+            "backup_count": backup_count(),
+            "segments": segments,
+            "total_bytes": sum(int(segment["bytes"]) for segment in segments),
+            "recent_events": len(read_tail(100)),
+        },
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
@@ -146,14 +288,31 @@ def main() -> int:
     parser.add_argument("--set-brightness", type=int, metavar="PERCENT")
     parser.add_argument("--set-temperature", type=int, metavar="KELVIN")
     parser.add_argument("--diagnose-display", action="store_true")
+    parser.add_argument("--event-log", type=Path)
+    parser.add_argument("--event-tail", type=int, metavar="COUNT")
+    parser.add_argument("--clear-event-log", action="store_true")
+    parser.add_argument("--json-status", action="store_true")
     args = parser.parse_args()
 
+    if args.event_log:
+        os.environ["MIDILIN_EVENT_LOG"] = str(args.event_log.expanduser())
     if args.gui:
         from .gui import main as gui_main
         return gui_main()
+    if args.clear_event_log:
+        removed = clear_events()
+        print(f"Event log {'removed' if removed else 'already absent'}: {event_path()}")
+        return 0
+    if args.event_tail is not None:
+        print(json.dumps(read_tail(args.event_tail), indent=2, ensure_ascii=False))
+        return 0
 
-    config = load_config(args.config)
+    config_path = args.config.expanduser()
+    config = load_config(config_path)
     errors = validate_config(config)
+    if args.json_status:
+        print(json.dumps(_json_status(config_path, config), indent=2, ensure_ascii=False))
+        return 0
     if args.validate_config:
         if errors:
             for error in errors:
@@ -162,6 +321,7 @@ def main() -> int:
         print(f"Configuration valid: {args.config}")
         return 0
     if errors:
+        emit("runtime_rejected", reason="invalid-config", errors=errors)
         raise SystemExit("Invalid configuration:\n- " + "\n- ".join(errors))
 
     dispatcher = ActionDispatcher(config)
@@ -195,6 +355,18 @@ def main() -> int:
     if args.forget_device_decisions:
         return backend.forget_device_decisions(config)
 
+    selected_profile = args.profile or str(config.get("active_profile", "linux-ops"))
+    emit(
+        "runtime_started",
+        pid=os.getpid(),
+        profile=selected_profile,
+        monitor=args.monitor,
+        dry_run=args.dry_run,
+        config=str(config_path.resolve()),
+        event_log=str(event_path()),
+        event_log_mode=log_mode(),
+    )
+    print(f"Structured event log: {event_path()} ({log_mode()} mode)")
     runtime = backend.ControllerRuntime(
         EventRouter(config, monitor=args.monitor, profile=args.profile, dry_run=args.dry_run),
         config=config, visual_theme=args.visual_theme,
@@ -202,6 +374,12 @@ def main() -> int:
     try:
         runtime.run()
     except KeyboardInterrupt:
+        emit("runtime_stopped", reason="keyboard-interrupt", pid=os.getpid())
         print()
         return 0
+    emit("runtime_stopped", reason="normal", pid=os.getpid())
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

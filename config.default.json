@@ -1,12 +1,13 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "include": [
     "defaults/actions.json",
     "defaults/model.json",
     "defaults/scripts.json",
     "defaults/visuals.json",
     "defaults/f1.json",
-    "defaults/x1.json"
+    "defaults/x1.json",
+    "defaults/autocode.json"
   ],
   "active_profile": "linux-ops",
   "profiles": {

@@ -3,7 +3,9 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from .autocode import dispatch as dispatch_autocode
 from .common import ControlEvent, X1_DEFAULT_ALIASES, log
+from .eventlog import emit as emit_event
 from .unified_actions import ActionDispatcher
 
 
@@ -14,6 +16,7 @@ class EventRouter:
     ):
         self.config = config
         self.monitor = monitor
+        self.dry_run = dry_run
         self.profile = profile or str(config.get("active_profile", "linux-ops"))
         self.dispatcher = ActionDispatcher(config, dry_run=dry_run)
         self.mappings: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
@@ -29,11 +32,12 @@ class EventRouter:
                         {str(raw): str(logical) for raw, logical in aliases.items()}
                     )
 
-        for mapping in config.get("mappings", []):
+        for index, mapping in enumerate(config.get("mappings", [])):
             if not isinstance(mapping, dict) or not bool(mapping.get("enabled", True)):
                 continue
             if not self._profile_matches(mapping):
                 continue
+            mapping = {**mapping, "_mapping_index": index}
             key = (str(mapping["device"]), str(mapping["control"]), str(mapping["kind"]))
             self.mappings.setdefault(key, []).append(mapping)
 
@@ -74,11 +78,45 @@ class EventRouter:
             source=str(getattr(event, "source", "")), raw_control=raw,
         )
 
+    def _dispatch(self, mapping: dict[str, Any], event: ControlEvent) -> None:
+        action = str(mapping.get("action", ""))
+        if action.startswith("autocode_"):
+            selected = action.removeprefix("autocode_").replace("_", "-")
+            dispatch_autocode(
+                self.config,
+                selected,
+                dry_run=self.dry_run,
+            )
+            return
+        self.dispatcher.dispatch(mapping, event)
+
     def emit(self, raw_event: Any) -> None:
         event = self._normalize(raw_event)
         held_key = (event.device, event.control)
+        emit_event(
+            "control_input",
+            profile=self.profile,
+            monitor=self.monitor,
+            dry_run=self.dry_run,
+            device=event.device,
+            control=event.control,
+            raw_control=event.raw_control,
+            event_kind=event.kind,
+            value=event.value,
+            minimum=event.minimum,
+            maximum=event.maximum,
+            ratio=event.ratio,
+            source=event.source,
+            held=[f"{device}.{control}" for device, control in sorted(self.held)],
+        )
         if event.kind == "press":
             self.held.add(held_key)
+            emit_event(
+                "modifier_state",
+                event_kind="press",
+                control=f"{event.device}.{event.control}",
+                held=[f"{device}.{control}" for device, control in sorted(self.held)],
+            )
         try:
             if self.monitor:
                 log(event.describe())
@@ -87,12 +125,50 @@ class EventRouter:
             mappings = self.mappings.get(key, [])
             if event.kind == "absolute" and mappings:
                 now = time.monotonic()
-                if now - self.last_dispatch.get(key, 0.0) < 0.04:
+                elapsed = now - self.last_dispatch.get(key, 0.0)
+                if elapsed < 0.04:
+                    emit_event(
+                        "input_throttled",
+                        device=event.device,
+                        control=event.control,
+                        event_kind=event.kind,
+                        elapsed_seconds=elapsed,
+                    )
                     return
                 self.last_dispatch[key] = now
+            matched = 0
             for mapping in mappings:
                 if self._conditions_match(mapping, event):
-                    self.dispatcher.dispatch(mapping, event)
+                    matched += 1
+                    emit_event(
+                        "mapping_selected",
+                        mapping_index=mapping.get("_mapping_index"),
+                        profile=self.profile,
+                        action=mapping.get("action"),
+                        device=event.device,
+                        control=event.control,
+                        event_kind=event.kind,
+                        requires=mapping.get("requires", []),
+                        unless=mapping.get("unless", []),
+                        held=[f"{device}.{control}" for device, control in sorted(self.held)],
+                    )
+                    self._dispatch(mapping, event)
+            if matched == 0:
+                emit_event(
+                    "mapping_unmatched",
+                    profile=self.profile,
+                    device=event.device,
+                    control=event.control,
+                    event_kind=event.kind,
+                    candidates=len(mappings),
+                    held=[f"{device}.{control}" for device, control in sorted(self.held)],
+                )
         finally:
             if event.kind == "release":
                 self.held.discard(held_key)
+                emit_event(
+                    "modifier_state",
+                    event_kind="release",
+                    control=f"{event.device}.{event.control}",
+                    held=[f"{device}.{control}" for device, control in sorted(self.held)],
+                )

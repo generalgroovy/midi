@@ -2,10 +2,20 @@ name: Validate
 
 on:
   push:
+    branches:
+      - main
+      - "agent/**"
   pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: midilin-validate-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate:
@@ -15,22 +25,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Validate Python
-        run: python -m py_compile traktor-system-controller.py traktor-controller.py traktor_controller/*.py
-      - name: Validate configuration
-        run: |
-          for file in config.default.json config.example.json config.blank.json defaults/*.json; do
-            python -m json.tool "$file" >/dev/null
-          done
-          TRAKTOR_CONTROLLER_BACKEND=$PWD/traktor-system-controller.py python traktor-controller.py --config config.default.json --validate-config
-      - name: Run tests
-        run: python -m unittest discover -s tests -v
-      - name: Validate shell
-        run: bash -n install.sh helpers/system-actions examples/model-controls-updated
-      - name: Validate SVG assets
-        run: python - <<'PY'
-          import xml.etree.ElementTree as ET
-          from pathlib import Path
-          for path in Path('assets').glob('*.svg'):
-              ET.parse(path)
-          PY
+      - name: Run the local and CI validation contract
+        run: bash validate-local.sh

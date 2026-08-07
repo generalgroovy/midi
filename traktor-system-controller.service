@@ -2,15 +2,32 @@
 Description=Traktor X1/F1 Linux system controller
 After=graphical-session.target pipewire.service wireplumber.service
 Wants=graphical-session.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
 ExecStart=%h/.local/bin/traktor-system-controller
 Restart=on-failure
-RestartSec=2
+RestartSec=3
+KillMode=control-group
 KillSignal=SIGINT
-TimeoutStopSec=6
+TimeoutStartSec=20
+TimeoutStopSec=8
+UMask=0077
+NoNewPrivileges=yes
+LockPersonality=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
 Environment=PYTHONUNBUFFERED=1
+Environment=MIDILIN_EVENT_LOG_MODE=actions
+Environment=MIDILIN_EVENT_LOG_FSYNC=0
+Environment=MIDILIN_EVENT_LOG_STRICT=0
+Environment=MIDILIN_EVENT_LOG_MAX_BYTES=8388608
+Environment=MIDILIN_EVENT_LOG_BACKUPS=4
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=midilin
 
 [Install]
 WantedBy=default.target

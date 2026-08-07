@@ -62,8 +62,9 @@ sudo pacman -S --needed \
   btop ncdu bmon fastfetch lm_sensors cliphist wl-clipboard wf-recorder \
   wdisplays blueman pacman-contrib desktop-file-utils
 
-mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications" \
-  "$LIB_DIR" "$CONFIG_DIR/defaults" "$CONFIG_DIR/hooks" "$CONFIG_DIR/scripts"
+install -d -m755 "$HOME/.local/bin" "$HOME/.local/share/applications" "$LIB_DIR"
+install -d -m700 "$CONFIG_DIR" "$CONFIG_DIR/defaults" \
+  "$CONFIG_DIR/hooks" "$CONFIG_DIR/scripts"
 install -m755 "$HERE/traktor-controller.py" "$HOME/.local/bin/traktor-system-controller"
 install -m755 "$HERE/midilin-gui" "$HOME/.local/bin/midilin-gui"
 install -Dm644 "$HERE/midilin.desktop" "$HOME/.local/share/applications/midilin.desktop"
@@ -73,25 +74,29 @@ cp -a "$HERE/traktor_controller" "$LIB_DIR/traktor_controller"
 cp -a "$HERE/helpers" "$LIB_DIR/helpers"
 chmod +x "$LIB_DIR/helpers/system-actions"
 
-install -m644 "$HERE/config.default.json" "$CONFIG_DIR/config.default.json"
-install -m644 "$HERE/config.example.json" "$CONFIG_DIR/config.example.json"
-install -m644 "$HERE/config.blank.json" "$CONFIG_DIR/config.blank.json"
+install -m600 "$HERE/config.default.json" "$CONFIG_DIR/config.default.json"
+install -m600 "$HERE/config.example.json" "$CONFIG_DIR/config.example.json"
+install -m600 "$HERE/config.blank.json" "$CONFIG_DIR/config.blank.json"
 cp -a "$HERE/defaults/." "$CONFIG_DIR/defaults/"
+find "$CONFIG_DIR/defaults" -type d -exec chmod 700 {} +
+find "$CONFIG_DIR/defaults" -type f -exec chmod 600 {} +
 
 if [[ ! -e "$CONFIG_DIR/hooks/model-controls-updated" ]]; then
-  install -m755 "$HERE/examples/model-controls-updated" "$CONFIG_DIR/hooks/model-controls-updated"
+  install -m700 "$HERE/examples/model-controls-updated" "$CONFIG_DIR/hooks/model-controls-updated"
 fi
 
 if $RESET_CONFIG && [[ -e "$CONFIG_DIR/config.json" ]]; then
   backup="$CONFIG_DIR/config.backup-$(date +%Y%m%d-%H%M%S).json"
-  cp "$CONFIG_DIR/config.json" "$backup"
+  install -m600 "$CONFIG_DIR/config.json" "$backup"
   printf 'Backed up existing configuration to %s\n' "$backup"
 fi
 if $RESET_CONFIG || [[ ! -e "$CONFIG_DIR/config.json" ]]; then
-  install -m644 "$HERE/config.default.json" "$CONFIG_DIR/config.json"
+  install -m600 "$HERE/config.default.json" "$CONFIG_DIR/config.json"
 else
+  chmod 600 "$CONFIG_DIR/config.json"
   printf 'Keeping existing configuration: %s\n' "$CONFIG_DIR/config.json"
 fi
+chmod 700 "$CONFIG_DIR" "$CONFIG_DIR/defaults" "$CONFIG_DIR/hooks" "$CONFIG_DIR/scripts"
 
 install -Dm644 "$HERE/traktor-system-controller.service" \
   "$HOME/.config/systemd/user/traktor-system-controller.service"
@@ -118,10 +123,15 @@ MIDILIN installed.
    or run:
      midilin-gui
 
+The long-running service uses actions-only structured logging and cannot gain
+new privileges. Run reviewed administrative commands separately in a terminal.
+
 Useful commands:
   traktor-system-controller --validate-config
   traktor-system-controller --list-devices
   traktor-system-controller --diagnose-display
   traktor-system-controller --set-brightness 50
   traktor-system-controller --set-temperature 4500
+  traktor-system-controller --json-status
+  traktor-system-controller --event-tail 100
 EOF
