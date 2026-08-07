@@ -21,6 +21,8 @@ RestrictRealtime=yes
 SystemCallArchitectures=native
 Environment=PYTHONUNBUFFERED=1
 Environment=MIDILIN_EVENT_LOG_MODE=actions
+Environment=MIDILIN_EVENT_LOG_FSYNC=0
+Environment=MIDILIN_EVENT_LOG_STRICT=0
 Environment=MIDILIN_EVENT_LOG_MAX_BYTES=8388608
 Environment=MIDILIN_EVENT_LOG_BACKUPS=4
 StandardOutput=journal
