@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -28,6 +32,40 @@ class CoreRuntimeRegressionTests(unittest.TestCase):
         thread.assert_not_called()
         self.assertIsNone(overlay._autocode_thread)
         overlay._stop_autocode_overlay()
+
+    def test_source_launcher_ignores_stale_installed_package(self) -> None:
+        repository = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as raw:
+            home = Path(raw)
+            stale_package = (
+                home
+                / ".local/lib/traktor-system-controller/traktor_controller"
+            )
+            stale_package.mkdir(parents=True)
+            (stale_package / "__init__.py").write_text(
+                "STALE_INSTALL = True\n",
+                encoding="utf-8",
+            )
+            environment = dict(os.environ)
+            environment["HOME"] = str(home)
+            environment.pop("PYTHONPATH", None)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repository / "traktor-controller.py"),
+                    "--config",
+                    str(repository / "config.default.json"),
+                    "--validate-config",
+                ],
+                cwd=repository,
+                env=environment,
+                text=True,
+                capture_output=True,
+                timeout=20,
+                check=False,
+            )
+        self.assertEqual(0, result.returncode, result.stderr or result.stdout)
+        self.assertIn("Configuration valid", result.stdout)
 
     def test_recovery_script_preserves_config_and_forces_core_profile(self) -> None:
         repository = Path(__file__).resolve().parents[1]
