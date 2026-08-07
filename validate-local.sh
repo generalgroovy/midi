@@ -72,6 +72,7 @@ PY
 printf '\n== Shell syntax ==\n'
 bash -n \
   install.sh \
+  update-and-test.sh \
   validate-local.sh \
   helpers/system-actions \
   examples/model-controls-updated
