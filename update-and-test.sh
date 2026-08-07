@@ -32,6 +32,14 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 
 git fetch --prune origin
+
+# An earlier sparse/partial checkout can leave tracked Python modules absent while
+# Git reports a clean worktree. Disable sparse mode before switching/pulling.
+if git config --bool core.sparseCheckout 2>/dev/null | grep -qx true; then
+  printf 'Disabling sparse checkout so the complete MIDILIN runtime is materialized.\n'
+  git sparse-checkout disable
+fi
+
 git switch "$branch"
 git pull --ff-only origin "$branch"
 local_head="$(git rev-parse HEAD)"
@@ -39,6 +47,38 @@ remote_head="$(git rev-parse "origin/$branch")"
 printf 'MIDILIN head: %s\n' "$local_head"
 [[ "$local_head" == "$remote_head" ]] || fail "local head does not match origin/$branch"
 [[ -z "$(git status --porcelain)" ]] || fail "worktree is not clean after update"
+
+# The user changes were stashed above, so restoring tracked files from the exact
+# remote head is safe here and repairs skip-worktree/incomplete checkout states.
+printf 'Verifying complete tracked runtime tree.\n'
+git restore --ignore-skip-worktree-bits --source="origin/$branch" --worktree -- .
+
+critical_files=(
+  traktor-controller.py
+  traktor-system-controller.py
+  traktor_controller/__init__.py
+  traktor_controller/cli.py
+  traktor_controller/cli_autocode.py
+  traktor_controller/common.py
+  traktor_controller/hardware.py
+  traktor_controller/router.py
+  traktor_controller/visuals.py
+)
+for path in "${critical_files[@]}"; do
+  git cat-file -e "origin/$branch:$path" 2>/dev/null \
+    || fail "remote branch is missing required tracked file: $path"
+  [[ -f "$path" && ! -L "$path" ]] \
+    || fail "local checkout is missing required tracked file after restore: $path"
+done
+
+PYTHONPATH="$repo" python - <<'PY'
+import traktor_controller.cli
+import traktor_controller.cli_autocode
+import traktor_controller.router
+print("MIDILIN_IMPORTS_OK")
+PY
+
+[[ -z "$(git status --porcelain)" ]] || fail "tracked tree differs from origin after repair"
 
 section "2/8 — Run complete source validation"
 bash validate-local.sh
